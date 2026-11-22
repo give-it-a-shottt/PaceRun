@@ -85,7 +85,7 @@ export default function HomeScreen() {
       case 'planned':
         return (
           <>
-            {startButton('시작', { initialConfig: today.config, planLabel: today.planLabel })}
+            {startButton(today.startLabel, { initialConfig: today.config, planLabel: today.planLabel })}
             {quickRunButton(QUICK_RUN_LABEL)}
           </>
         );
@@ -97,16 +97,22 @@ export default function HomeScreen() {
           </>
         );
       case 'restDay':
-        return quickRunButton('가볍게 10분 뛰기');
+        return quickRunButton(today.quickRunLabel);
       case 'done':
         return (
-          <Button
-            label="기록 보기"
-            variant="outlineStrong"
-            icon={ChartBarIcon}
-            iconWeight="regular"
-            onPress={() => router.navigate('/records')}
-          />
+          <>
+            <Button
+              label={today.recordsLabel}
+              variant="outlineStrong"
+              icon={ChartBarIcon}
+              iconWeight="regular"
+              onPress={() => router.navigate('/records')}
+            />
+            {/* 피그마에는 [기록 보기]만 있다. 같은 날 한 번 더 뛸 길이 막히지 않게 글자 버튼을 하나 둔다. */}
+            <View style={styles.links}>
+              <TextLink label={today.againLabel} onPress={() => openSheet({})} />
+            </View>
+          </>
         );
     }
   };

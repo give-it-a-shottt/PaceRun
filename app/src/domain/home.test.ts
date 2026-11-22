@@ -239,6 +239,7 @@ describe('오늘의 러닝 카드', () => {
       reason: '걷기에서 숨을 고르면 막판이 덜 처져요',
       config: INTERVAL.config,
       planLabel: '인터벌 입문 3회차',
+      startLabel: '시작',
     });
   });
 
@@ -266,6 +267,7 @@ describe('오늘의 러닝 카드', () => {
       mode: 'free',
       title: '오늘은 쉬는 날이에요',
       message: '다음 러닝은 토요일 인터벌 입문 3회차예요. 몸이 가볍다면 10분만 뛰어도 1회로 인정돼요.',
+      quickRunLabel: '가볍게 10분 뛰기',
     });
   });
 
@@ -296,6 +298,17 @@ describe('오늘의 러닝 카드', () => {
       title: '인터벌 입문 3회차',
       stats: `3.12 km · 20:14 · 평균 6'02"/km`,
       comparison: '지난번보다 페이스가 8초 빨라졌어요',
+      recordsLabel: '기록 보기',
+      againLabel: '한 번 더 뛰기',
+    });
+  });
+
+  it('계획의 요일 값이 망가져 다음 러닝을 찾지 못하면 그 문장만 뺀다', () => {
+    const broken: PlanItem = { ...INTERVAL, weekday: 9 };
+    const view = home([broken], []);
+    expect(view.today).toMatchObject({
+      kind: 'restDay',
+      message: '몸이 가볍다면 10분만 뛰어도 1회로 인정돼요.',
     });
   });
 

@@ -19,6 +19,7 @@
 | active_run | id PK(항상 1) · state_json · saved_at | 진행 중인 러닝의 계산 상태 한 벌. 러닝 중 약 1초마다 덮어쓰고 끝나면 지운다. 앱이 꺼졌다 켜졌을 때 복구에 쓴다(스키마 2단계) |
 
 - 인덱스: runs(started_at 내림차순) — 기록 목록, runs(sync_state) — 올릴 것 찾기, run_points(run_id, id) — 러닝 한 건의 경로를 순서대로 읽기.
+- 이름의 약속: `plan_items.label`은 회차가 없는 운동 이름("인터벌 입문")이고, 그 계획으로 뛴 러닝의 `runs.plan_label`은 뒤에 회차를 붙인 이름("인터벌 입문 3회차")이다. 다음 회차는 같은 이름으로 인정된 러닝의 가장 큰 회차 + 1로 정한다(`domain/home.ts`의 `parsePlanLabel` · `nextSession`). 계획 없이 뛴 러닝은 `plan_label`이 null이거나 "10분만 뛰기"다.
 - 시간은 모두 epoch 밀리초(INTEGER). 거리는 미터, 페이스는 km당 초.
 - mode = free / interval / cadence / pacemaker. config_json은 모드별 목표값이다(`app/src/domain/types.ts`의 `RunConfig`).
 

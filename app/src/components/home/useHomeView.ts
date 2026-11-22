@@ -2,8 +2,12 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
+import { addDays, startOfDay } from '@/domain/week';
 import { loadHome, type HomeView } from '@/services/homeData';
 import { useSettingsStore } from '@/state/settingsStore';
+
+/** 자정 정각에 읽으면 시계 오차로 아직 어제일 수 있어 조금 지나서 읽는다 */
+const MIDNIGHT_MARGIN_MS = 2_000;
 
 /**
  * loading = 아직 그릴 값이 없음(처음 읽는 중이거나 실패 뒤 다시 읽는 중) / ready = 값이 있음 / failed = 읽지 못함.
@@ -47,7 +51,13 @@ export function useHomeView() {
       const subscription = AppState.addEventListener('change', (appState) => {
         if (appState === 'active') reload();
       });
-      return () => subscription.remove();
+      // 화면을 켜 둔 채 자정을 넘기는 경우: 다음 날 0시가 조금 지난 뒤 한 번 더 읽는다
+      const untilTomorrow = addDays(startOfDay(Date.now()), 1) - Date.now() + MIDNIGHT_MARGIN_MS;
+      const midnight = setTimeout(reload, untilTomorrow);
+      return () => {
+        subscription.remove();
+        clearTimeout(midnight);
+      };
     }, [reload]),
   );
 

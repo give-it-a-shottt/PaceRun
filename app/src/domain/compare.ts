@@ -1,4 +1,4 @@
-/** "지난번 비교" 한 줄. 홈의 오늘 완료 카드, 완료 요약, 러닝 상세가 함께 쓴다. */
+/** "지난번 비교" 한 줄과, 비교할 지난 기록 찾기. 홈의 오늘의 러닝 카드가 쓴다(완료 요약 · 러닝 상세도 같은 문장을 쓸 예정 — F-006). */
 import type { RunMode } from './types';
 
 /** 비교에 필요한 만큼의 러닝 정보 */
@@ -12,8 +12,11 @@ const MODE_NOUN: Record<RunMode, string> = {
   pacemaker: '페이스메이커',
 };
 
-/** current보다 앞선, 같은 모드이고 평균 페이스가 있는 가장 최근 기록 */
-export function previousComparable<T extends ComparableRun>(current: ComparableRun, runs: readonly T[]): T | null {
+/** 기준 시각(startedAt)보다 앞선, 같은 모드이고 평균 페이스가 있는 가장 최근 기록 */
+export function previousComparable<T extends ComparableRun>(
+  current: Pick<ComparableRun, 'mode' | 'startedAt'>,
+  runs: readonly T[],
+): T | null {
   let found: T | null = null;
   for (const run of runs) {
     if (run.mode !== current.mode || run.avgPaceSecPerKm == null || run.startedAt >= current.startedAt) continue;

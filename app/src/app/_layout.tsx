@@ -2,7 +2,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { AppState, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
@@ -35,9 +35,15 @@ export default function RootLayout() {
     if (status !== 'loading') SplashScreen.hideAsync();
   }, [status]);
 
-  // 알림 시간이 바뀔 때마다(설정 · 온보딩) OS에 걸어 둔 매일 알림을 다시 맞춘다
+  // 알림 시간이 바뀔 때마다(설정 · 온보딩) OS에 걸어 둔 매일 알림을 다시 맞춘다.
+  // 앱으로 돌아올 때도 맞춘다 — 알림 권한이 없어 예약하지 못했다가, 폰 설정에서 권한을 켜고 돌아온 경우.
   useEffect(() => {
-    if (status === 'ready') void syncReminder(reminderTime);
+    if (status !== 'ready') return;
+    void syncReminder(reminderTime);
+    const subscription = AppState.addEventListener('change', (appState) => {
+      if (appState === 'active') void syncReminder(reminderTime);
+    });
+    return () => subscription.remove();
   }, [status, reminderTime]);
 
   if (status === 'loading') return null;

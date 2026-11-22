@@ -40,9 +40,11 @@ export type TodayCard =
       /** [시작]을 누르면 시작 전 설정에 미리 채울 값 */
       config: RunConfig;
       planLabel: string;
+      /** 주 버튼 문구 */
+      startLabel: string;
     }
   | { kind: 'noPlan'; mode: 'free'; title: string; message: string; startLabel: string; config: RunConfig }
-  | { kind: 'restDay'; mode: 'free'; title: string; message: string }
+  | { kind: 'restDay'; mode: 'free'; title: string; message: string; quickRunLabel: string }
   | {
       kind: 'done';
       runId: string;
@@ -52,6 +54,9 @@ export type TodayCard =
       stats: string;
       /** 지난번 비교 한 줄. 비교할 수 없으면 null */
       comparison: string | null;
+      recordsLabel: string;
+      /** 오늘 한 번 더 뛰고 싶을 때 누르는 글자 버튼 */
+      againLabel: string;
     };
 
 export type HomeView = {
@@ -145,17 +150,20 @@ function todayCard({ now, plan, runs }: HomeInput): TodayCard {
   const item = plan.find((candidate) => candidate.weekday === today);
   if (item) return plannedCard(item, runs, now);
 
+  // 다음 러닝을 찾지 못하면(계획의 요일 값이 망가진 경우) 그 문장만 뺀다
+  const sentences = [nextPlannedText(plan, runs, today), '몸이 가볍다면 10분만 뛰어도 1회로 인정돼요.'];
   return {
     kind: 'restDay',
     mode: 'free',
     title: '오늘은 쉬는 날이에요',
-    message: `${nextPlannedText(plan, runs, today)} 몸이 가볍다면 10분만 뛰어도 1회로 인정돼요.`,
+    message: sentences.filter(Boolean).join(' '),
+    quickRunLabel: '가볍게 10분 뛰기',
   };
 }
 
 function plannedCard(item: PlanItem, runs: readonly FinishedRun[], now: number): TodayCard {
   const title = sessionTitle(item, runs);
-  const previous = previousComparable({ mode: item.mode, startedAt: now, avgPaceSecPerKm: null }, runs);
+  const previous = previousComparable({ mode: item.mode, startedAt: now }, runs);
   return {
     kind: 'planned',
     mode: item.mode,
@@ -166,6 +174,7 @@ function plannedCard(item: PlanItem, runs: readonly FinishedRun[], now: number):
     reason: REASONS[item.mode],
     config: item.config,
     planLabel: title,
+    startLabel: '시작',
   };
 }
 
@@ -179,6 +188,8 @@ function doneCard(run: FinishedRun, runs: readonly FinishedRun[]): TodayCard {
     title: run.planLabel ?? MODE_LABEL[run.mode],
     stats: parts.join(' · '),
     comparison: comparePace(run, previousComparable(run, runs)),
+    recordsLabel: '기록 보기',
+    againLabel: '한 번 더 뛰기',
   };
 }
 
@@ -193,6 +204,7 @@ function nextPlannedText(plan: readonly PlanItem[], runs: readonly FinishedRun[]
     // 이름이 항상 "…회차"로 끝나므로 "예요"가 맞다
     return `다음 러닝은 ${day} ${sessionTitle(item, runs)}예요.`;
   }
+  // 계획이 있으면 7일 안에 반드시 찾는다. 요일 값이 0~6 밖인 줄만 있을 때에만 여기로 온다.
   return '';
 }
 

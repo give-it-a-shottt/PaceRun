@@ -81,7 +81,10 @@ function WeekCell({ cell, paintKey }: { cell: WeekCellView; paintKey: string | n
   );
 }
 
-/** 이미 칠하는 모션을 보여 준 러닝. 앱을 켜 둔 동안 기억한다. */
+/**
+ * 이미 칠하는 모션을 보여 준 러닝. 앱을 켜 둔 동안만 기억한다(저장하지 않는다).
+ * 그래서 앱을 완전히 껐다 켜면 같은 날 한 번 더 칠해질 수 있다 — 보상 모션이라 그 정도는 괜찮다고 봤다.
+ */
 let lastPaintedKey: string | null = null;
 
 /**

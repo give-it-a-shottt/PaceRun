@@ -4,6 +4,7 @@ import {
   formatReminderClock,
   formatReminderHour,
   formatReminderMinute,
+  parseReminderTime,
   stepHour,
   stepMinute,
   toReminderTime,
@@ -66,5 +67,24 @@ describe('stepMinute', () => {
     expect(stepMinute({ hour: 7, minute: 35 }, 1)).toEqual({ hour: 7, minute: 40 });
     expect(stepMinute({ hour: 7, minute: 35 }, -1)).toEqual({ hour: 7, minute: 30 });
     expect(stepMinute({ hour: 7, minute: 55 }, 1)).toEqual({ hour: 7, minute: 0 });
+  });
+});
+
+describe('parseReminderTime', () => {
+  it('저장된 "HH:mm"을 시 · 분으로 읽는다', () => {
+    expect(parseReminderTime('07:30')).toEqual({ hour: 7, minute: 30 });
+    expect(parseReminderTime('00:00')).toEqual({ hour: 0, minute: 0 });
+    expect(parseReminderTime('23:59')).toEqual({ hour: 23, minute: 59 });
+  });
+
+  it('알림을 꺼 둔 값(null)과 모양이 틀린 값은 null이다', () => {
+    for (const bad of [null, '', '7:30', '24:00', '07:60', '07-30', ' 07:30', '07:30:00', 'abc']) {
+      expect(parseReminderTime(bad)).toBeNull();
+    }
+  });
+
+  it('저장한 모양을 다시 읽으면 같은 시각이 된다', () => {
+    const clock = { hour: 19, minute: 40 };
+    expect(parseReminderTime(toReminderTime(clock))).toEqual(clock);
   });
 });

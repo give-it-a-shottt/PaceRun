@@ -37,13 +37,20 @@ export async function requestNotificationAccess(): Promise<boolean> {
   return requested.granted;
 }
 
-/** 배터리 최적화가 켜져 있으면(true) 화면이 꺼졌을 때 기록이 끊길 수 있다. 확인할 수 없으면 false로 본다. */
-export async function isBatteryOptimized(): Promise<boolean> {
+/** optimized = 켜져 있음(화면이 꺼지면 기록이 끊길 수 있다) / unrestricted = 풀려 있음 / unknown = 확인하지 못함 */
+export type BatteryOptimization = 'optimized' | 'unrestricted' | 'unknown';
+
+export async function getBatteryOptimization(): Promise<BatteryOptimization> {
   try {
-    return await Battery.isBatteryOptimizationEnabledAsync();
+    return (await Battery.isBatteryOptimizationEnabledAsync()) ? 'optimized' : 'unrestricted';
   } catch {
-    return false;
+    return 'unknown';
   }
+}
+
+/** 배터리 최적화가 켜져 있으면 true. 확인할 수 없으면 false로 본다(확인도 못 했는데 경고를 띄우지 않는다). */
+export async function isBatteryOptimized(): Promise<boolean> {
+  return (await getBatteryOptimization()) === 'optimized';
 }
 
 /** 배터리 최적화 예외 목록 화면을 연다. 사용자가 목록에서 이 앱을 '제한 없음'으로 바꾼다. */

@@ -6,7 +6,7 @@ import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { BatteryWarningIcon, CheckIcon } from '@/components/icons';
 import { OnboardingStep, OnboardingTextAction } from '@/components/onboarding/OnboardingStep';
-import { isBatteryOptimized, openBatterySettings } from '@/services/permissions';
+import { getBatteryOptimization, openBatterySettings } from '@/services/permissions';
 import { showToast } from '@/state/toastStore';
 import { useTheme } from '@/theme/ThemeContext';
 import { radius, space } from '@/theme/tokens';
@@ -18,7 +18,7 @@ const NUMBER_SIZE = 24;
 /** ONB_01_002 Step 2. 배터리 최적화 해제: 설정 화면으로 보내고, 돌아오면 풀렸는지 다시 확인한다. 건너뛸 수 있다. */
 export default function BatteryStep() {
   const { colors } = useTheme();
-  const optimized = useBatteryOptimized();
+  const unrestricted = useBatteryUnrestricted();
 
   // 같은 화면을 두 번 쌓지 않도록 push가 아니라 navigate를 쓴다(빠르게 두 번 눌렀을 때)
   const goNext = () => router.navigate('/onboarding/goal');
@@ -30,7 +30,7 @@ export default function BatteryStep() {
     });
   };
 
-  if (!optimized) {
+  if (unrestricted) {
     // 피그마에 없는 상태. 같은 틀에서 아이콘 · 문구 · 버튼만 바꿔 가장 단순하게 보여 준다.
     return (
       <OnboardingStep
@@ -74,17 +74,18 @@ export default function BatteryStep() {
 }
 
 /**
- * 배터리 최적화가 켜져 있는지. 화면에 들어올 때와, 설정에 다녀와 앱으로 돌아올 때마다 다시 확인한다.
- * 확인이 끝나기 전에는 켜져 있다고 보고 안내(피그마 기본 모양)를 먼저 보여 준다.
+ * 배터리 최적화가 풀려 있는지. 화면에 들어올 때와, 설정에 다녀와 앱으로 돌아올 때마다 다시 확인한다.
+ * 확인이 끝나기 전이거나 확인하지 못했으면 풀리지 않았다고 보고 안내(피그마 기본 모양)를 보여 준다 —
+ * 확인하지 못한 것을 "해제됐어요"라고 말하지 않는다.
  */
-function useBatteryOptimized(): boolean {
-  const [optimized, setOptimized] = useState(true);
+function useBatteryUnrestricted(): boolean {
+  const [unrestricted, setUnrestricted] = useState(false);
 
   useEffect(() => {
     let alive = true;
     const check = () => {
-      void isBatteryOptimized().then((value) => {
-        if (alive) setOptimized(value);
+      void getBatteryOptimization().then((value) => {
+        if (alive) setUnrestricted(value === 'unrestricted');
       });
     };
     check();
@@ -97,7 +98,7 @@ function useBatteryOptimized(): boolean {
     };
   }, []);
 
-  return optimized;
+  return unrestricted;
 }
 
 const styles = StyleSheet.create({

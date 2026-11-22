@@ -18,7 +18,19 @@ export const REMINDER_BODY = '10분만 뛰어도 1회로 인정돼요. 가볍게
  * 알림 권한이 없으면 예약하지 않고 false를 돌려준다(권한 요청은 화면이 한다).
  * 예약에 실패해도 앱은 그대로 쓸 수 있어야 해서 오류를 삼킨다.
  */
-export async function syncReminder(time: string | null): Promise<boolean> {
+export function syncReminder(time: string | null): Promise<boolean> {
+  // 지우기 → 예약을 한 줄로 세운다. 알림 시간을 연달아 바꿔도 마지막에 고른 시각이 마지막에 예약된다.
+  const result = queue.then(() => schedule(time));
+  queue = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
+let queue: Promise<void> = Promise.resolve();
+
+async function schedule(time: string | null): Promise<boolean> {
   try {
     await Notifications.cancelScheduledNotificationAsync(NOTIFICATION_ID);
     const at = parseReminderTime(time);

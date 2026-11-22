@@ -238,6 +238,39 @@ export async function listFinishedRuns(range?: { from: number; to: number }): Pr
   return rows.map(toRecord);
 }
 
+/** 끝난 러닝의 요약 칸만 담은 모양(목표값 config는 뺐다) */
+export type RunDigest = Pick<
+  RunRecord,
+  'id' | 'mode' | 'planLabel' | 'startedAt' | 'elapsedMs' | 'distanceM' | 'avgPaceSecPerKm' | 'counted'
+>;
+
+type DigestRow = Pick<
+  RunRow,
+  'id' | 'mode' | 'plan_label' | 'started_at' | 'elapsed_ms' | 'distance_m' | 'avg_pace_s_per_km' | 'counted'
+>;
+
+/**
+ * 끝난 러닝 전체를 요약 칸만 읽는다(홈 · 계획 탭의 주 연속 · 회차 · 지난번 비교용).
+ * 화면이 보일 때마다 부르므로 필요한 칸만 읽고, 목표값(config_json)은 읽지도 풀지도 않는다 —
+ * 그 칸이 망가진 줄 하나 때문에 홈 전체가 읽기 실패가 되는 일도 막는다.
+ */
+export async function listRunDigests(): Promise<RunDigest[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<DigestRow>(
+    "SELECT id, mode, plan_label, started_at, elapsed_ms, distance_m, avg_pace_s_per_km, counted FROM runs WHERE status = 'finished'",
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    mode: row.mode,
+    planLabel: row.plan_label,
+    startedAt: row.started_at,
+    elapsedMs: row.elapsed_ms,
+    distanceM: row.distance_m,
+    avgPaceSecPerKm: row.avg_pace_s_per_km,
+    counted: row.counted === 1,
+  }));
+}
+
 /** 같은 모드로 뛴 바로 앞 기록(완료 요약 · 상세의 "지난번 비교"용) */
 export async function getPreviousRunOfMode(mode: RunMode, before: number): Promise<RunRecord | null> {
   const db = await getDb();
