@@ -8,10 +8,14 @@
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import * as Speech from 'expo-speech';
 
+import { disposePlayer } from './audioPlayers';
+
 /** duck = 안내 동안 음악을 낮춘다 / mix = 낮추지 않고 섞는다(메트로놈이 계속 울리는 케이던스 모드) */
 export type VoiceMixing = 'duck' | 'mix';
 
 const VOICE_LANGUAGE = 'ko-KR';
+/** 안내 하나가 이 시간 안에 끝났다는 신호가 없으면 끝난 것으로 본다(음악 볼륨이 낮은 채로 남지 않게) */
+const UTTERANCE_TIMEOUT_MS = 15_000;
 
 let mixing: VoiceMixing = 'duck';
 let duckPlayer: AudioPlayer | null = null;
@@ -38,14 +42,22 @@ export function say(text: string): void {
 
   let finished = false;
   const done = () => {
-    // 완료 · 중단 · 오류 콜백이 겹쳐 불려도 한 번만 센다
+    // 완료 · 중단 · 오류 · 시간 초과가 겹쳐 불려도 한 번만 센다
     if (finished) return;
     finished = true;
+    clearTimeout(timeout);
     pending = Math.max(0, pending - 1);
     if (pending === 0) stopDucking();
   };
+  const timeout = setTimeout(done, UTTERANCE_TIMEOUT_MS);
 
-  Speech.speak(text, { language: VOICE_LANGUAGE, onDone: done, onStopped: done, onError: done });
+  try {
+    Speech.speak(text, { language: VOICE_LANGUAGE, onDone: done, onStopped: done, onError: done });
+  } catch (error) {
+    // 말하지 못해도 러닝은 계속돼야 한다
+    console.warn('[voice] 안내를 말하지 못했어요', error);
+    done();
+  }
 }
 
 /** 러닝이 끝나면 부른다. 말하던 안내를 멈추고 음악 볼륨을 되돌린다. */
@@ -57,7 +69,7 @@ export async function releaseVoice(): Promise<void> {
     console.warn('[voice] 음성을 멈추지 못했어요', error);
   }
   stopDucking();
-  duckPlayer?.remove();
+  disposePlayer(duckPlayer);
   duckPlayer = null;
 }
 

@@ -8,3 +8,20 @@ export function averagePaceSecPerKm(elapsedMs: number, distanceM: number): numbe
   if (distanceM < AVG_PACE_MIN_DISTANCE_M || elapsedMs <= 0) return null;
   return elapsedMs / 1000 / (distanceM / KM);
 }
+
+/** 최근 페이스를 낼 때 쓰는 표본: 그 시점의 경과 시간과 누적 거리 */
+export type PaceSample = { elapsedMs: number; distanceM: number };
+
+/** 표본이 이만큼의 시간에 걸쳐 있어야 최근 페이스를 낸다 */
+export const PACE_MIN_SPAN_MS = 20_000;
+
+/** 최근 표본들로 낸 "지금 페이스"(km당 초). 표본이 모자라거나 움직이지 않았으면 null */
+export function recentPaceSecPerKm(samples: readonly PaceSample[]): number | null {
+  if (samples.length < 2) return null;
+  const first = samples[0];
+  const last = samples[samples.length - 1];
+  const spanMs = last.elapsedMs - first.elapsedMs;
+  const moved = last.distanceM - first.distanceM;
+  if (spanMs < PACE_MIN_SPAN_MS || moved <= 0) return null;
+  return spanMs / 1000 / (moved / KM);
+}

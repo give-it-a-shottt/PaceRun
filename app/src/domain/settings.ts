@@ -8,6 +8,8 @@ import {
 } from './types';
 
 const REMINDER_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+// 저장돼 있던 값을 읽을 때 "말이 되는 값인가"만 보는 넓은 범위다(서버가 받는 범위와 같다).
+// 화면에서 고를 수 있는 좁은 범위는 runConfig.ts의 CONFIG_LIMITS에 따로 있다 — 그 범위를 바꿔도 예전 값을 버리지 않으려는 것.
 const CADENCE_SPM_MIN = 120;
 const CADENCE_SPM_MAX = 220;
 const VOICE_INTERVAL_KM_MIN = 1;

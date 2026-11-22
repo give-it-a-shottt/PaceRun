@@ -76,18 +76,40 @@ export async function deleteRun(runId: string): Promise<void> {
   });
 }
 
+/** 한 문장에 넣는 점의 수. SQLite가 한 문장에 받는 값의 수(기본 999개)를 넘지 않게 한다. */
+const POINTS_PER_INSERT = 100;
+
 async function insertPoints(db: SQLiteDatabase, runId: string, points: readonly RunPoint[]): Promise<void> {
-  for (const point of points) {
-    await db.runAsync(
-      'INSERT INTO run_points (run_id, t, lat, lng, accuracy, elapsed_ms) VALUES (?, ?, ?, ?, ?, ?)',
+  // 점마다 문장을 따로 실행하지 않고 묶어서 넣는다(저장이 밀렸다가 한꺼번에 들어올 때 빠르다)
+  for (let start = 0; start < points.length; start += POINTS_PER_INSERT) {
+    const chunk = points.slice(start, start + POINTS_PER_INSERT);
+    const placeholders = chunk.map(() => '(?, ?, ?, ?, ?, ?)').join(', ');
+    const values = chunk.flatMap((point) => [
       runId,
       point.t,
       point.lat,
       point.lng,
       point.accuracy,
       Math.round(point.elapsedMs),
+    ]);
+    await db.runAsync(
+      `INSERT INTO run_points (run_id, t, lat, lng, accuracy, elapsed_ms) VALUES ${placeholders}`,
+      values,
     );
   }
+}
+
+/**
+ * 끝나지 않은 채 남은 러닝 가운데 복구용 상태(active_run)가 없는 것을 '끝남'으로 닫는다.
+ * 시작 직후 첫 저장 전에 앱이 죽었거나, 시작에 실패한 러닝을 지우지 못했을 때 생긴다.
+ * 그대로 두면 다시 이어 갈 방법이 없는 '진행 중' 러닝이 영영 남는다.
+ */
+export async function closeOrphanRuns(): Promise<void> {
+  await withWriteTransaction(async (db) => {
+    const active = await db.getFirstAsync<{ state_json: string }>('SELECT state_json FROM active_run WHERE id = 1');
+    if (active) return;
+    await db.runAsync("UPDATE runs SET status = 'finished', ended_at = updated_at WHERE status != 'finished'");
+  });
 }
 
 /**
@@ -165,7 +187,7 @@ export async function loadActiveRun(): Promise<{ state: RunState; savedAt: numbe
     return { state: JSON.parse(row.state_json) as RunState, savedAt: row.saved_at };
   } catch {
     // 읽을 수 없는 상태는 복구할 수 없으니 지운다. 저장된 위치 점과 진행 값은 runs · run_points에 남아 있다.
-    await db.runAsync('DELETE FROM active_run WHERE id = 1');
+    await withWriteTransaction((writer) => writer.runAsync('DELETE FROM active_run WHERE id = 1'));
     return null;
   }
 }

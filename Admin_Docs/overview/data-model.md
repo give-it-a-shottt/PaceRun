@@ -18,6 +18,7 @@
 | settings | key PK · value(JSON) | 주 목표, 알림 시간, 음성 안내, 기본 케이던스, 러닝 화면 테마, 온보딩 완료, 마지막 설정, 마지막 동기화 |
 | active_run | id PK(항상 1) · state_json · saved_at | 진행 중인 러닝의 계산 상태 한 벌. 러닝 중 약 1초마다 덮어쓰고 끝나면 지운다. 앱이 꺼졌다 켜졌을 때 복구에 쓴다(스키마 2단계) |
 
+- 인덱스: runs(started_at 내림차순) — 기록 목록, runs(sync_state) — 올릴 것 찾기, run_points(run_id, id) — 러닝 한 건의 경로를 순서대로 읽기.
 - 시간은 모두 epoch 밀리초(INTEGER). 거리는 미터, 페이스는 km당 초.
 - mode = free / interval / cadence / pacemaker. config_json은 모드별 목표값이다(`app/src/domain/types.ts`의 `RunConfig`).
 
@@ -28,6 +29,7 @@
 | cadence | spm (분당 걸음 수) · durationSec (초) | spm 120~220(소리 파일은 150~190, 5 단위) |
 | pacemaker | targetPaceSecPerKm (km당 초) · distanceM (미터) | 양수 |
 
+- 위 범위는 저장된 값을 읽을 때 받아 주는 넓은 범위다(`domain/settings.ts`). 화면에서 고를 수 있는 범위는 더 좁다(`domain/runConfig.ts`의 CONFIG_LIMITS, Q-004).
 - 서버 API에서는 같은 값을 snake_case로 주고받는다(예: `runSec` ↔ `run_sec`, api-list.md "러닝").
 - 로그인 토큰은 SQLite가 아니라 expo-secure-store에 둔다.
 

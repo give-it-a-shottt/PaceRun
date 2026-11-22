@@ -8,7 +8,7 @@
  */
 import { distanceM, type LatLng } from './geo';
 import { modeCues } from './modeCues';
-import { averagePaceSecPerKm } from './pace';
+import { averagePaceSecPerKm, recentPaceSecPerKm, type PaceSample } from './pace';
 import { COUNTED_MIN_ELAPSED_MS, type RunConfig } from './types';
 
 /** 이보다 부정확한(오차 반경이 큰) 위치는 버린다. */
@@ -25,8 +25,6 @@ export const GPS_FIRST_FIX_GRACE_MS = 20_000;
 export const GPS_BACK_DISPLAY = 'GPS 신호를 다시 잡았어요';
 /** 현재 페이스는 최근 이 시간의 평균으로 구한다. */
 export const PACE_WINDOW_MS = 30_000;
-/** 표본이 이 시간 이상 쌓여야 현재 페이스를 낸다. */
-export const PACE_MIN_SPAN_MS = 20_000;
 
 const KM = 1000;
 
@@ -63,7 +61,6 @@ export type Cue = {
   toast?: boolean;
 };
 
-type PaceSample = { elapsedMs: number; distanceM: number };
 
 export type RunState = {
   runId: string;
@@ -181,6 +178,8 @@ export function applyLocation(state: RunState, fix: LocationFix): { state: RunSt
   if (state.status !== 'active') return { state, point: null };
   if (fix.accuracy != null && fix.accuracy > MAX_ACCURACY_M) return { state, point: null };
   if (state.anchor && fix.t <= state.anchor.t) return { state, point: null };
+  // 재개하기 전(멈춰 있던 동안)에 잰 위치가 늦게 도착한 경우. 기준점으로 쓰면 멈춰 있던 동안의 이동이 섞인다.
+  if (!state.anchor && state.lastFixAt != null && fix.t < state.lastFixAt) return { state, point: null };
 
   const elapsed = elapsedMs(state, fix.t);
   const fresh: RunState = {
@@ -276,14 +275,7 @@ function closeKmSegments(state: RunState, elapsed: number): RunState {
 
 /** 최근 20~30초의 평균 페이스(km당 초). 표본이 모자라면 null */
 export function currentPaceSecPerKm(state: RunState): number | null {
-  const samples = state.paceSamples;
-  if (samples.length < 2) return null;
-  const first = samples[0];
-  const last = samples[samples.length - 1];
-  const spanMs = last.elapsedMs - first.elapsedMs;
-  const moved = last.distanceM - first.distanceM;
-  if (spanMs < PACE_MIN_SPAN_MS || moved <= 0) return null;
-  return spanMs / 1000 / (moved / KM);
+  return recentPaceSecPerKm(state.paceSamples);
 }
 
 export type RunSummary = {

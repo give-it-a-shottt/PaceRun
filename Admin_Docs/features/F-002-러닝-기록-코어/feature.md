@@ -2,11 +2,14 @@
 
 ## 내가 할 일
 - 설계 의도가 내 뜻과 맞는지 확인 → 아래 "설계 의도"
-- 실기기 야외 확인(화면 끄고 주머니 15분) → 아래 "실기기 확인 목록"
+- 실기기 야외 확인(화면 끄고 주머니 15분 등 6가지) → 아래 "실기기 확인 목록". 끝나면 알려 주면 [됨]으로 올린다
+- 리뷰 판정 확인 → review/SUMMARY.md "최종 판정"
+- 면접 답 3개 → 아래 "면접 예상 질문"
+- 내가 정할 질문 4개 → OPEN_QUESTIONS.md Q-003 · Q-004 · Q-007 · Q-008
 
 ## 한눈에 보기
-상태: [보완] (리뷰 전)
-무엇을: 러닝 한 번을 시작해서 끝낼 때까지의 뼈대. 화면이 꺼져도 GPS로 거리 · 시간을 재고, 일시정지 · 길게 눌러 종료 · 강제 종료 복구까지 한다. 모드는 자유 러닝만 온전히 되고, 나머지 세 모드의 소리 안내는 F-003에서 붙인다.
+상태: [보완] → 지적 반영 (2차 리뷰까지 끝, 실기기 확인 전)
+무엇을: 러닝 한 번을 시작해서 끝낼 때까지의 뼈대. 화면이 꺼져도 GPS로 거리 · 시간을 재고, 일시정지 · 길게 눌러 종료 · 강제 종료 복구까지 한다. 나머지 세 모드(인터벌 · 발걸음 박자 · 페이스메이커)의 소리 안내는 F-003에서 붙였다.
 왜: 이 앱에서 가장 먼저 되어야 하는 것(우선순위 1). 뛰는 중에 기록이 끊기지 않는 것이 디자인보다 먼저다.
 
 ## 설계 의도 (AI 초안 — 사용자 위임, 확인 전)
@@ -39,6 +42,7 @@
 - 잠금화면 알림의 [일시정지] / [재개]가 화면을 켜지 않고도 되는가
 - 이어폰의 재생 · 정지 버튼이 음악만 멈추고 기록은 계속되는가, 전화가 와도 기록이 계속되는가
 - 앱을 최근 앱 목록에서 밀어 없앤 뒤 다시 켰을 때: 러닝이 이어지고 있거나 복구 창이 뜨는가
+- 러닝 중 앱을 밀어 없앤 채 2~3분 더 뛴 뒤 열었을 때: 그동안의 거리가 이어져 있는가(화면 없이 되살아나는 경로 — 2차 리뷰 R3)
 
 ## 결과 (AI 작성 — 구현 후)
 - 바뀐 파일 (모두 `app/src/` 아래)
@@ -47,9 +51,10 @@
   - 기기 기능: `services/runController.ts`(진행 관리), `runLocation.ts`(백그라운드 위치), `voice.ts`(음성 + 음악 볼륨 낮추기), `runNotification.ts`(잠금화면 버튼), `permissions.ts`, `gps.ts`, `runHistory.ts`, `haptics.ts`(진동), `appVisibility.ts`
   - 상태: `state/runStore.ts`, `state/useRunScheme.ts`(러닝 화면 테마)
   - 화면: `app/run/_layout.tsx`, `countdown.tsx`, `active.tsx`, `summary/[id].tsx`, `app/(tabs)/home.tsx`(임시 홈)
-  - 화면 부품: `components/run/`(RunSetupSheet · ModeCard · ConfigAdjuster · BatteryBanner · GpsNotice · LocationAlert · RunDashboard · RunNow · Stat · HoldToFinishButton · RunBottomActions · RunSummaryView · PocketMode · TextLink, 훅 useStartRun · usePendingRunRecovery · useHoldProgress · useAndroidBack, configFields), `components/ModeBadge.tsx`
+  - 화면 부품: `components/run/`(RunSetupSheet · ModeCard · ConfigAdjuster · BatteryBanner · GpsNotice · LocationAlert · RunDashboard · RunNow · Stat · HoldToFinishButton · RunBottomActions · RunSummaryView · PocketMode · TextLink, 훅 useStartRun · usePendingRunRecovery · useHoldProgress · useAndroidBack). 목표값 한 칸 늘리기 · 줄이기 계산은 `domain/configFields.ts`(순수 함수), `components/ModeBadge.tsx`
   - 소리 파일: `app/assets/audio/`(무음 1개 + 메트로놈 9개), 만드는 스크립트 `app/scripts/make_audio.py`
-  - 테스트: `domain/runEngine.test.ts`, `runView.test.ts`, `runConfig.test.ts`, `services/runController.test.ts`, `components/run/configFields.test.ts`, `db/schema.test.ts`(보강)
+  - 테스트: `domain/runEngine.test.ts`, `runView.test.ts`, `runConfig.test.ts`, `configFields.test.ts`, `services/runController.test.ts`, `db/schema.test.ts`(보강), `db/database.test.ts`
+  - 다음 기능용으로 미리 둔 함수(이번 기능에서는 부르는 곳이 없다): `db/runsRepo.ts`의 listFinishedRuns · getPreviousRunOfMode · getRunPoints · getRunSegments, `services/runHistory.ts`의 loadRunDetail → F-004 · F-006에서 쓴다
 - 실제 구조
   - 계산은 전부 `runEngine`의 순수 함수가 한다. `runController`는 "위치가 왔을 때 · 1초 타이머가 울렸을 때 계산 함수를 부르고, 결과를 화면 상태 · DB · 음성으로 보내는" 일만 한다(D-005).
   - 진행 값 · 새 위치 점 · 복구용 상태(active_run)를 약 1초마다 한 트랜잭션으로 저장한다. 저장에 실패한 점은 버리지 않고 다음 저장 때 다시 넣는다.
@@ -58,10 +63,15 @@
   - 진행 관리자는 파일이 읽히는 순간 위치 받을 곳을 등록한다. 앱이 죽었다 위치 작업으로 되살아나도 위치를 받고, 그때 잠금화면 버튼 · 음성도 다시 붙인다.
   - 폰 DB 쓰기는 모두 `withWriteTransaction`(늘 쓰는 연결 + 한 줄 세우기)을 거친다. 매초 연결을 새로 열지 않는다(R2 지적 반영).
   - 화면이 꺼져 있거나 앱이 뒤에 있으면 화면 상태 갱신을 건너뛴다(계산 · 저장 · 음성은 계속).
+  - 음성 말하기가 오류를 내거나 끝났다는 신호가 15초 안에 오지 않으면 끝난 것으로 보고 음악 볼륨을 되돌린다(2차 리뷰 R3 지적 반영).
+  - 강제 종료 뒤 복구할 때(여기까지 저장 · 오래 끊김)는 위치 받기와 잠금화면 알림을 함께 끈다. 시작 직후 죽어 복구할 수 없게 남은 '진행 중' 줄은 다음에 앱을 열 때 닫는다(R2 · R3 지적 반영).
+  - 위치 점은 100개씩 묶어 한 문장으로 넣는다. 일시정지 전에 잡힌 위치가 재개 뒤 늦게 도착하면 버린다.
   - 화면은 `describeRun()`이 준 글자를 그리기만 한다. 경과 시간은 저장하지 않고 `지금 시각`으로 매번 계산한다.
   - 러닝 화면 묶음(`run/_layout`)만 OS 다크 설정을 따라 Dark가 된다.
 - 설계 의도와 다른 점
-  - 위치 '항상 허용'이 없어도 러닝을 시작할 수 있다. 안드로이드에서는 알림을 띄운 포그라운드 서비스로 시작하면 '앱 사용 중' 권한만으로 화면이 꺼져도 위치가 들어온다(설치된 expo-location 소스에서 확인). 시작 흐름은 '앱 사용 중'을 필수로, '항상 허용'은 이어서 한 번 요청한다.
+  - 위치 '항상 허용'을 요청하지 않는다(기획은 온보딩에서 '항상 허용' 요청). 안드로이드에서는 알림을 띄운 포그라운드 서비스로 시작하면 '앱 사용 중' 권한만으로 화면이 꺼져도 위치가 들어온다(설치된 expo-location 소스에서 확인, 에뮬레이터에서 '앱 사용 중'만 준 채 기록 확인). 앱 설정에서도 그 권한을 뺐다 → Q-007.
+  - 자유 러닝의 목표 시간을 채우면 음성 · 화면으로 한 번 알리고 러닝은 이어진다(자동 종료 없음). 직접 끝낼 때까지 기록한다.
+  - 카운트다운 화면에 [취소]가 있다(누르면 홈으로). "시작합니다" 음성은 카운트다운이 끝나 러닝이 시작될 때 나온다.
   - 시작 직후 첫 위치는 20초까지 기다린 뒤 끊김으로 본다(그 뒤는 10초). 위치 서비스가 켜지는 시간을 끊김으로 오해하지 않으려는 것.
   - 신호가 돌아오면 화면의 최근 안내 줄을 "GPS 신호를 다시 잡았어요"로 바꾼다(음성은 끊길 때 1번만).
   - 일시정지 화면의 버튼 글자는 피그마 "다시 시작"이 아니라 설계 문서의 "재개"를 썼다(잠금화면 알림 버튼과 같은 말). 시작 전 설정의 자유 모드 카드는 "자유 러닝"으로 나온다(피그마는 "자유").
@@ -81,12 +91,19 @@
   - 확인 중 찾아 고친 것: 강제 종료 뒤 다시 켜면 복구 창 없이 이어지면서 꺼져 있던 시간이 경과 시간에 들어갔다(위치 작업 등록이 남아 "기록 중"으로 오판) → 마지막 저장 시각으로 판단하게 고침
 
 ## 리뷰
-- review/SUMMARY.md (아직 없음)
+- [review/SUMMARY.md](review/SUMMARY.md) — 2차까지 진행. 최종 상태 [보완] → 지적 반영(3차 없음)
+- 1차(2026-11-23) [막힘]: 위험 1 · 주의 다수 → 반영. 2차(2026-11-23) [보완]: 위험 0 · 주의 8 · 제안 16 → 반영(거절 4개는 SUMMARY에 이유)
+- 2차 반영분은 F-003 작업과 같은 커밋에 들어 있다
 
 ## 열린 질문
-- Q-003, Q-004
+- Q-003, Q-004, Q-007, Q-008
 
 ## 면접 예상 질문
-(1차 리뷰 뒤 작성)
+1. 러닝 경과 시간을 타이머로 1초씩 더하지 않고 "시작 시각과 지금 시각의 차이"로 계산한 이유는 무엇인가요? 그렇게 했을 때 생기는 약점은 무엇인가요?
+   - 답:
+2. 러닝 중에 앱이 강제로 꺼지면 기록은 어떻게 되나요? 다시 켰을 때 "이어서"와 "여기까지 저장"을 어떻게 구분해 처리하나요?
+   - 답:
+3. 종료 버튼을 누른 뒤 저장이 끝나기 전에 위치가 또 들어오거나 종료를 한 번 더 누르면 어떻게 되나요? 왜 그런 처리가 필요했나요?
+   - 답:
 
 최종 수정: 2026-11-23 · 관련: D-001, D-004, D-005, D-009

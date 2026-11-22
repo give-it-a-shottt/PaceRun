@@ -2,7 +2,11 @@
 import { formatKm, formatPace, speakDuration } from './format';
 import type { RunConfig, RunMode } from './types';
 
-/** 목표값을 고를 때의 범위와 한 번에 바뀌는 크기 */
+/**
+ * 목표값을 고를 때의 범위와 한 번에 바뀌는 크기(화면에서 고를 수 있는 값).
+ * settings.ts의 isRunConfig는 "저장돼 있던 값을 읽어도 되는지"만 보므로 이보다 범위가 넓다
+ * (나중에 여기 범위를 바꿔도 예전에 저장한 값을 읽을 수 있게).
+ */
 export const CONFIG_LIMITS = {
   freeDurationMin: { min: 10, max: 120, step: 5 },
   intervalRunSec: { min: 30, max: 600, step: 30 },

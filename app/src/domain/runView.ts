@@ -2,16 +2,47 @@
  * 러닝 중 화면에 보여 줄 글자와 숫자를 계산 상태에서 뽑아낸다.
  * 화면 컴포넌트는 여기서 받은 값을 그리기만 한다(모드마다 달라지는 판단을 화면에 두지 않는다).
  */
-import { formatDistanceKm, formatDuration, formatPace } from './format';
+import { formatDistanceKm, formatDuration, formatKm, formatPace } from './format';
+import {
+  buildIntervalSteps,
+  INTERVAL_KIND_LABEL,
+  intervalPositionAt,
+  type IntervalConfig,
+  type IntervalKind,
+} from './interval';
+import { PACE_TOLERANCE_SEC, paceGapSec } from './modeCues';
 import { averagePaceSecPerKm } from './pace';
-import { elapsedMs, msUntilCounted, type RunState } from './runEngine';
-import type { RunMode } from './types';
+import { currentPaceSecPerKm, elapsedMs, msUntilCounted, type RunState } from './runEngine';
+import type { RunConfig, RunMode } from './types';
 
 export const MODE_LABEL: Record<RunMode, string> = {
   free: '자유 러닝',
   interval: '인터벌',
   cadence: '발걸음 박자',
   pacemaker: '페이스메이커',
+};
+
+/** 인터벌의 구간 띠(레인). 칸 너비는 구간 시간에 비례하게 그린다. */
+export type LaneView = {
+  steps: { kind: IntervalKind; durationMs: number }[];
+  /** 지금 구간의 번호. 모두 마쳤으면 steps.length */
+  currentIndex: number;
+  /** 지금 구간이 얼마나 지났는지 0~1 */
+  progress: number;
+  /** "5 / 16 구간" — 색만으로 알리지 않기 위한 글자 */
+  countText: string;
+  /** "달리기 1:00 · 걷기 1:30 × 8" */
+  caption: string;
+};
+
+/** 페이스메이커의 목표 띠 게이지. */
+export type GaugeView = {
+  /** 목표보다 얼마나 느린지(km당 초). 양수 = 느림. 아직 재는 중이면 null */
+  gapSec: number | null;
+  /** 이 범위(±초) 안이면 목표 띠 안이다 */
+  toleranceSec: number;
+  /** "+8초 느림" / "5초 빠름" / "목표 페이스" / "페이스를 재는 중" — 색만으로 알리지 않기 위한 글자 */
+  text: string;
 };
 
 export type RunView = {
@@ -34,6 +65,12 @@ export type RunView = {
   lastCue: string | null;
   gpsLost: boolean;
   paused: boolean;
+  /** 일시정지 화면의 설명 줄. 인터벌이면 어떤 구간에서 멈췄는지도 알려 준다 */
+  pausedText: string;
+  /** 인터벌 모드에서만 있다 */
+  lane: LaneView | null;
+  /** 페이스메이커 모드에서만 있다 */
+  gauge: GaugeView | null;
 };
 
 // GPS가 끊기면 두 지표의 설명 줄이 바뀐다(피그마 RUN_02_006)
@@ -44,12 +81,12 @@ const PACE_CAPTION_GPS_LOST = '평균 페이스 · 잠시 멈춤';
 
 export function describeRun(state: RunState, now: number): RunView {
   const elapsed = elapsedMs(state, now);
-  const primary = primaryFor(state, now, elapsed);
+  const config = state.config;
 
   return {
-    title: state.planLabel ?? MODE_LABEL[state.config.mode],
+    title: state.planLabel ?? MODE_LABEL[config.mode],
     elapsedText: `경과 ${formatDuration(elapsed)}`,
-    ...primary,
+    ...primaryFor(state, now, elapsed),
     distanceText: `${formatDistanceKm(state.distanceM)} km`,
     distanceCaption: state.gpsLost ? DISTANCE_CAPTION_GPS_LOST : DISTANCE_CAPTION,
     paceText: `${formatPace(averagePaceSecPerKm(elapsed, state.distanceM))}/km`,
@@ -57,20 +94,25 @@ export function describeRun(state: RunState, now: number): RunView {
     lastCue: state.lastCueDisplay,
     gpsLost: state.gpsLost,
     paused: state.status === 'paused',
+    pausedText: pausedTextFor(config, elapsed),
+    lane: config.mode === 'interval' ? laneFor(config, elapsed) : null,
+    gauge: config.mode === 'pacemaker' ? gaugeFor(state, config) : null,
   };
 }
 
 type Primary = Pick<RunView, 'primaryLabel' | 'primaryValue' | 'secondaryText'>;
 
 function primaryFor(state: RunState, now: number, elapsed: number): Primary {
-  switch (state.config.mode) {
+  const config = state.config;
+  switch (config.mode) {
     case 'free':
-      return freePrimary(state, now, elapsed, state.config.targetDurationSec);
-    // 인터벌 · 케이던스 · 페이스메이커의 전용 표시는 F-003에서 채운다. 그 전까지는 경과 시간을 보여 준다.
+      return countdownPrimary('자유 러닝', config.targetDurationSec, state, now, elapsed, (target) => `목표 ${formatDuration(target * 1000)}`);
     case 'interval':
+      return intervalPrimary(config, state, now, elapsed);
     case 'cadence':
+      return countdownPrimary('발걸음 박자', config.durationSec, state, now, elapsed, () => `분당 ${config.spm}걸음`);
     case 'pacemaker':
-      return elapsedPrimary('경과 시간', state, now, elapsed);
+      return pacemakerPrimary(config, state, now, elapsed);
   }
 }
 
@@ -79,18 +121,82 @@ function elapsedPrimary(label: string, state: RunState, now: number, elapsed: nu
   return { primaryLabel: label, primaryValue: formatDuration(elapsed), secondaryText: countedText(state, now) };
 }
 
-function freePrimary(state: RunState, now: number, elapsed: number, target: number | null): Primary {
-  if (target == null) return elapsedPrimary('경과 시간', state, now, elapsed);
-  const remainingMs = target * 1000 - elapsed;
+/** 남은 시간을 올림해 보여 준다(1분짜리 구간이 "0:59"가 아니라 "1:00"에서 시작하게). */
+function formatRemaining(ms: number): string {
+  return formatDuration(Math.ceil(ms / 1000) * 1000);
+}
+
+/** 목표 시간이 있으면 남은 시간을 크게, 없거나 넘겼으면 경과 시간을 크게 보여 준다(자유 · 케이던스). */
+function countdownPrimary(
+  name: string,
+  targetSec: number | null,
+  state: RunState,
+  now: number,
+  elapsed: number,
+  secondary: (targetSec: number) => string,
+): Primary {
+  if (targetSec == null) return elapsedPrimary('경과 시간', state, now, elapsed);
+  const remainingMs = targetSec * 1000 - elapsed;
   if (remainingMs > 0) {
-    return {
-      primaryLabel: '자유 러닝 · 남은 시간',
-      primaryValue: formatDuration(remainingMs),
-      secondaryText: `목표 ${formatDuration(target * 1000)}`,
-    };
+    return { primaryLabel: `${name} · 남은 시간`, primaryValue: formatRemaining(remainingMs), secondaryText: secondary(targetSec) };
   }
   // 목표 시간을 넘겨도 끝내지 않는다. 직접 끝낼 때까지 기록한다.
   return elapsedPrimary('목표를 채웠어요 · 경과 시간', state, now, elapsed);
+}
+
+function intervalPrimary(config: IntervalConfig, state: RunState, now: number, elapsed: number): Primary {
+  const position = intervalPositionAt(config, elapsed);
+  if (!position.step) return elapsedPrimary('인터벌 완료 · 경과 시간', state, now, elapsed);
+  const next = position.next;
+  return {
+    primaryLabel: `${INTERVAL_KIND_LABEL[position.step.kind]} · 남은 시간`,
+    primaryValue: formatRemaining(position.remainingMs),
+    secondaryText: next ? `다음  ${INTERVAL_KIND_LABEL[next.kind]} ${formatDuration(next.durationMs)}` : '다음  끝',
+  };
+}
+
+function laneFor(config: IntervalConfig, elapsed: number): LaneView {
+  const position = intervalPositionAt(config, elapsed);
+  const current = position.step?.idx ?? position.total;
+  return {
+    steps: buildIntervalSteps(config).map((step) => ({ kind: step.kind, durationMs: step.durationMs })),
+    currentIndex: current,
+    progress: position.progress,
+    countText: `${Math.min(current + 1, position.total)} / ${position.total} 구간`,
+    caption: `달리기 ${formatDuration(config.runSec * 1000)} · 걷기 ${formatDuration(config.walkSec * 1000)} × ${config.repeats}`,
+  };
+}
+
+type PacemakerConfig = Extract<RunConfig, { mode: 'pacemaker' }>;
+
+function pacemakerPrimary(config: PacemakerConfig, state: RunState, now: number, elapsed: number): Primary {
+  const remainingM = config.distanceM - state.distanceM;
+  if (remainingM <= 0) return elapsedPrimary('목표 거리를 채웠어요 · 경과 시간', state, now, elapsed);
+  return {
+    primaryLabel: '지금 페이스',
+    primaryValue: formatPace(currentPaceSecPerKm(state)),
+    secondaryText: `목표 ${formatPace(config.targetPaceSecPerKm)}/km · 남은 거리 ${formatKm(Math.ceil(remainingM / 100) * 100)}`,
+  };
+}
+
+function gaugeFor(state: RunState, config: PacemakerConfig): GaugeView {
+  const gap = paceGapSec(state, config);
+  return { gapSec: gap, toleranceSec: PACE_TOLERANCE_SEC, text: gaugeText(gap) };
+}
+
+function gaugeText(gap: number | null): string {
+  if (gap == null) return '페이스를 재는 중';
+  const seconds = Math.round(Math.abs(gap));
+  if (seconds <= PACE_TOLERANCE_SEC) return '목표 페이스';
+  return gap > 0 ? `+${seconds}초 느림` : `${seconds}초 빠름`;
+}
+
+const SAVING_NOTE = '기록은 계속 저장되고 있어요.';
+
+function pausedTextFor(config: RunConfig, elapsed: number): string {
+  if (config.mode !== 'interval') return SAVING_NOTE;
+  const step = intervalPositionAt(config, elapsed).step;
+  return step ? `${INTERVAL_KIND_LABEL[step.kind]} 구간이 남았어요. ${SAVING_NOTE}` : SAVING_NOTE;
 }
 
 function countedText(state: RunState, now: number): string {

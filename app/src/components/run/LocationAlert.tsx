@@ -6,7 +6,7 @@ import type { LocationIssue } from './useStartRun';
 const COPY: Record<LocationIssue, { title: string; message: string }> = {
   permission: {
     title: '위치 권한이 필요해요',
-    message: "러닝 경로와 거리를 기록하려면 위치 권한을 '항상 허용'으로 바꿔 주세요.",
+    message: "러닝 경로와 거리를 기록하려면 위치 권한이 필요해요. 설정에서 '앱 사용 중에만 허용'으로 바꿔 주세요.",
   },
   services: {
     title: '폰의 위치(GPS)가 꺼져 있어요',

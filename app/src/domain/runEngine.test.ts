@@ -132,6 +132,21 @@ describe('거리 계산', () => {
     expect(state.distanceM).toBeCloseTo(6, 1);
   });
 
+  it('재개하기 전에 잰 위치가 재개 뒤에 늦게 도착해도 기준점으로 쓰지 않는다', () => {
+    let state = applyLocation(start(), fixAt(1, 0)).state;
+    state = pause(state, T0 + 3_000).state;
+    state = resume(state, T0 + 60_000).state;
+
+    // 멈춰 있던 30초 시점에 잰 위치가 이제야 온다
+    const late = applyLocation(state, fixAt(30, 500));
+    expect(late.point).toBeNull();
+
+    // 재개 뒤의 위치부터 기준을 잡고 거리를 잰다
+    state = applyLocation(late.state, fixAt(61, 600)).state;
+    state = applyLocation(state, fixAt(62, 603)).state;
+    expect(state.distanceM).toBeCloseTo(3, 1);
+  });
+
   it('시각이 거꾸로 온 위치는 무시한다', () => {
     let state = applyLocation(start(), fixAt(5, 0)).state;
     const stale = applyLocation(state, fixAt(4, 3));

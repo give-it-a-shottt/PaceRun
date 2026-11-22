@@ -7,7 +7,7 @@
  */
 import * as Crypto from 'expo-crypto';
 
-import { deleteRun, insertRun, loadActiveRun, saveFinishedRun, saveProgress } from '@/db/runsRepo';
+import { closeOrphanRuns, deleteRun, insertRun, loadActiveRun, saveFinishedRun, saveProgress } from '@/db/runsRepo';
 import { loadSettings } from '@/db/settingsRepo';
 import {
   applyLocation,
@@ -31,6 +31,7 @@ import { useSettingsStore } from '@/state/settingsStore';
 import { showToast } from '@/state/toastStore';
 
 import { isAppVisible } from './appVisibility';
+import { startMetronome, stopMetronome } from './metronome';
 import { setLocationListener, startLocationUpdates, stopLocationUpdates, isLocationRunning } from './runLocation';
 import { showRunControl, startRunControl, stopRunControl } from './runNotification';
 import { prepareVoice, releaseVoice, say, type VoiceMixing } from './voice';
@@ -53,7 +54,10 @@ let timer: ReturnType<typeof setInterval> | null = null;
 let unsavedPoints: RunPoint[] = [];
 let lastSavedAt = 0;
 let saveFailures = 0;
-/** DB 쓰기를 한 줄로 세워 순서가 뒤바뀌지 않게 한다 */
+/**
+ * 진행 값 저장을 한 줄로 세운다. DB 쪽(withWriteTransaction)도 줄을 세우지만, 여기서는
+ * 저장에 실패한 점을 다음 저장 앞에 다시 끼워 넣는 순서와, 끝낼 때 "앞선 저장이 다 끝난 뒤"를 기다리는 데 쓴다.
+ */
 let writeQueue: Promise<void> = Promise.resolve();
 /** 시작하는 중. 그 사이 다시 시작을 누르거나 홈이 "끝나지 않은 러닝"을 찾지 않게 한다. */
 let starting = false;
@@ -75,6 +79,18 @@ async function refreshSettings(): Promise<void> {
   const settings = store.status === 'ready' ? store.settings : await loadSettings().catch(() => store.settings);
   voiceEnabled = settings.voiceEnabled;
   stepOptions = { voiceIntervalKm: settings.voiceIntervalKm };
+}
+
+/**
+ * 박자 소리를 지금 상태에 맞춘다: 케이던스 모드로 뛰는 중일 때만 울리고, 일시정지 · 종료 · 다른 모드에서는 끈다.
+ * 상태가 바뀌는 곳마다 부르면 되고, 여러 번 불러도 결과가 같다.
+ */
+function syncMetronome(): void {
+  if (state && !finishing && state.status === 'active' && state.config.mode === 'cadence') {
+    startMetronome(state.config.spm);
+  } else {
+    stopMetronome();
+  }
 }
 
 /** 케이던스 모드는 메트로놈이 계속 울려서, 안내 때 음악을 낮추지 않고 섞는다 */
@@ -140,6 +156,7 @@ async function attach(): Promise<void> {
     ),
     prepareVoice(voiceMixingFor(state.config)),
   ]);
+  syncMetronome();
 }
 
 function startTimer(): void {
@@ -170,9 +187,9 @@ async function restoreOrStop(fixes: LocationFix[]): Promise<void> {
   if (state || starting) return; // 그 사이 화면이 러닝을 시작했거나 이어 붙였다
   if (!saved || Date.now() - saved.savedAt > LIVE_SAVE_GAP_MS) {
     // 되살릴 러닝이 없거나, 기록이 한참 끊겨 있었다(앱이 강제 종료된 뒤 다시 켜진 경우 등).
-    // 끊겨 있던 시간을 뛴 시간으로 치지 않도록 여기서 이어 가지 않고 위치 받기를 끈다.
+    // 끊겨 있던 시간을 뛴 시간으로 치지 않도록 여기서 이어 가지 않고 위치 받기와 조작 알림을 끈다.
     // 끝나지 않은 러닝은 DB에 남아 있고, 화면이 뜨면 "이어서 / 여기까지 저장"을 묻는다.
-    await stopStrayLocation();
+    await stopStrayTracking();
     return;
   }
   state = saved.state;
@@ -181,12 +198,14 @@ async function restoreOrStop(fixes: LocationFix[]): Promise<void> {
   advance(Date.now(), fixes);
 }
 
-/** 러닝 중이 아닌데 남아 있는 위치 작업을 끈다(알림이 계속 떠 있고 배터리를 쓴다). */
-async function stopStrayLocation(): Promise<void> {
-  try {
-    await stopLocationUpdates();
-  } catch (error) {
-    console.warn('[runController] 남아 있는 위치 받기를 끄지 못했어요', error);
+/**
+ * 러닝 중이 아닌데 남아 있는 위치 작업과 잠금화면 조작 알림을 끈다.
+ * 앱이 강제 종료되면 둘 다 남는다. 조작 알림은 밀어서 지울 수 없게 고정돼 있어 꼭 지워 줘야 한다.
+ */
+async function stopStrayTracking(): Promise<void> {
+  const results = await Promise.allSettled([stopLocationUpdates(), stopRunControl()]);
+  for (const result of results) {
+    if (result.status === 'rejected') console.warn('[runController] 남아 있는 위치 받기 · 알림을 끄지 못했어요', result.reason);
   }
 }
 
@@ -211,7 +230,14 @@ function advance(now: number, fixes: LocationFix[]): void {
 
 function deliver(cues: Cue[]): void {
   for (const cue of cues) {
-    if (voiceEnabled) say(cue.speech);
+    if (voiceEnabled) {
+      try {
+        say(cue.speech);
+      } catch (error) {
+        // 안내를 말하지 못해도 계산 · 저장은 이어져야 한다
+        console.warn('[runController] 안내를 말하지 못했어요', error);
+      }
+    }
     if (cue.toast) showToast(cue.display);
   }
 }
@@ -252,6 +278,7 @@ export async function pauseRunSession(): Promise<void> {
   deliver(paused.cues);
   publish(now);
   queueSave(now, true);
+  syncMetronome();
   await showRunControl(true);
 }
 
@@ -263,6 +290,7 @@ export async function resumeRunSession(): Promise<void> {
   deliver(resumed.cues);
   publish(now);
   queueSave(now, true);
+  syncMetronome();
   await showRunControl(false);
 }
 
@@ -282,6 +310,7 @@ export function finishRunSession(): Promise<RunSummary | null> {
 async function finishCurrentRun(current: RunState): Promise<RunSummary | null> {
   // 저장을 기다리는 동안 계산 · 저장이 더 돌지 않게 먼저 멈춘다(advance도 finishing이면 아무것도 하지 않는다)
   stopTimer();
+  stopMetronome();
   const summary = finish(current, Date.now());
 
   // 앞서 줄 세운 쓰기가 끝난 뒤에 마지막 저장을 한다. 그때까지 못 쓴 점을 함께 넣는다.
@@ -291,6 +320,8 @@ async function finishCurrentRun(current: RunState): Promise<RunSummary | null> {
   } catch (error) {
     console.warn('[runController] 러닝을 끝내지 못했어요', error);
     startTimer();
+    // 끝내지 못했으니 러닝은 이어진다. finishing이 풀린 뒤에 박자를 다시 맞춘다.
+    setTimeout(syncMetronome, 0);
     return null;
   }
 
@@ -305,6 +336,7 @@ async function finishCurrentRun(current: RunState): Promise<RunSummary | null> {
 
 function resetSession(): void {
   stopTimer();
+  stopMetronome();
   state = null;
   unsavedPoints = [];
   saveFailures = 0;
@@ -331,13 +363,19 @@ export async function checkPendingRun(): Promise<PendingRun | null> {
   const saved = await loadActiveRun();
   if (state || starting) return checkPendingRun(); // 읽는 사이 러닝이 시작되거나 되살아났다
   if (!saved) {
-    // 러닝이 없는데 위치 작업만 남아 있을 수 있다(지난번에 끄지 못한 경우)
-    await stopStrayLocation();
+    // 러닝이 없는데 위치 작업 · 알림만 남아 있을 수 있다(지난번에 끄지 못한 경우).
+    // 복구할 방법이 없는 '진행 중' 러닝이 남아 있으면 끝난 것으로 닫는다.
+    await stopStrayTracking();
+    await closeOrphanRuns().catch((error) => {
+      console.warn('[runController] 남아 있던 러닝을 닫지 못했어요', error);
+    });
     return null;
   }
 
   const now = Date.now();
-  if (now - saved.savedAt <= LIVE_SAVE_GAP_MS && (await isLocationRunning())) {
+  const live = now - saved.savedAt <= LIVE_SAVE_GAP_MS && (await isLocationRunning());
+  if (state || starting) return checkPendingRun(); // 확인하는 사이 위치가 들어와 이미 되살아났다
+  if (live) {
     state = saved.state;
     await refreshSettings();
     await attach();
@@ -345,8 +383,8 @@ export async function checkPendingRun(): Promise<PendingRun | null> {
     return { stillRunning: true, elapsedMs: elapsedMs(saved.state, now), distanceM: saved.state.distanceM };
   }
 
-  // 기록이 끊겨 있었다. 등록만 남아 있는 위치 작업은 끄고, 사용자에게 묻는다.
-  await stopStrayLocation();
+  // 기록이 끊겨 있었다. 남아 있는 위치 작업 · 조작 알림은 끄고, 사용자에게 묻는다.
+  await stopStrayTracking();
   // 앱이 꺼져 있던 시간은 일시정지로 친다
   const suspended = suspendAt(saved.state, saved.savedAt);
   return { stillRunning: false, elapsedMs: elapsedMs(suspended, saved.savedAt), distanceM: suspended.distanceM };
@@ -390,5 +428,6 @@ export async function savePendingRun(): Promise<RunSummary | null> {
     console.warn('[runController] 멈춰 있던 러닝을 저장하지 못했어요', error);
     return null;
   }
+  await stopStrayTracking();
   return summary;
 }

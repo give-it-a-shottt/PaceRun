@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from 'react';
+import type { ComponentType } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
@@ -7,13 +7,13 @@ import type { RunView } from '@/domain/runView';
 import { useTheme } from '@/theme/ThemeContext';
 import { layout, space, type ColorName } from '@/theme/tokens';
 
+import { Lane } from './Lane';
+import { PaceGauge } from './PaceGauge';
 import { RunNow } from './RunNow';
 import { Stat, StatRow } from './Stat';
 
 type Props = {
   view: RunView;
-  /** 큰 숫자 묶음과 지표 사이 자리. 인터벌 레인 · 페이스 게이지가 들어온다. */
-  lane?: ReactNode;
   /** 진행 값 저장이 연달아 실패하고 있는지 */
   saveFailing: boolean;
 };
@@ -21,7 +21,7 @@ type Props = {
 const SAVE_FAILING_TEXT = '기록 저장이 잘 안 되고 있어요';
 
 /** 러닝 중 · 일시정지 · GPS 끊김을 같은 배치로 그린다. 받은 값을 그리기만 하고 계산하지 않는다. */
-export function RunDashboard({ view, lane, saveFailing }: Props) {
+export function RunDashboard({ view, saveFailing }: Props) {
   const { colors } = useTheme();
 
   return (
@@ -42,13 +42,15 @@ export function RunDashboard({ view, lane, saveFailing }: Props) {
             icon={PauseIcon}
             value={view.primaryValue}
             // 저장이 실패하고 있을 때 "저장되고 있어요"라고 말하지 않는다
-            secondary={saveFailing ? `${SAVE_FAILING_TEXT}.` : '기록은 계속 저장되고 있어요.'}
+            secondary={saveFailing ? `${SAVE_FAILING_TEXT}.` : view.pausedText}
           />
         ) : (
           <RunNow label={view.primaryLabel} value={view.primaryValue} secondary={view.secondaryText} />
         )}
 
-        {lane}
+        {/* 큰 숫자 묶음과 지표 사이 자리: 인터벌은 레인, 페이스메이커는 게이지 */}
+        {view.lane ? <Lane lane={view.lane} /> : null}
+        {view.gauge ? <PaceGauge gauge={view.gauge} /> : null}
 
         <StatRow>
           <Stat value={view.distanceText} label={view.distanceCaption} />

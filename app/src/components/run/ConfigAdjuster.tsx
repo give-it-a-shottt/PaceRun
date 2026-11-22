@@ -8,7 +8,7 @@ import type { RunConfig } from '@/domain/types';
 import { useTheme } from '@/theme/ThemeContext';
 import { radius, space } from '@/theme/tokens';
 
-import { CONFIG_TITLE, configFields, type ConfigField } from './configFields';
+import { CONFIG_TITLE, configFields, type ConfigField } from '@/domain/configFields';
 
 type Props = {
   config: RunConfig;

@@ -2,9 +2,9 @@
  * 시작 전 설정 시트에서 조절하는 목표값 칸. 모드마다 어떤 값을 어떤 범위(CONFIG_LIMITS)로
  * 바꿀 수 있는지와, 한 칸 줄이거나 늘렸을 때의 설정을 만든다. 화면은 받은 값을 그리기만 한다.
  */
-import { formatKm, formatPace, speakDuration } from '@/domain/format';
-import { CONFIG_LIMITS } from '@/domain/runConfig';
-import type { RunConfig, RunMode } from '@/domain/types';
+import { formatKm, formatPace, speakDuration } from './format';
+import { CONFIG_LIMITS } from './runConfig';
+import type { RunConfig, RunMode } from './types';
 
 type Limit = { min: number; max: number; step: number };
 type ConfigOf<M extends RunMode> = Extract<RunConfig, { mode: M }>;

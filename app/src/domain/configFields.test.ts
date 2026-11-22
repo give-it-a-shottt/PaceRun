@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { RunConfig } from '@/domain/types';
+import type { RunConfig } from './types';
 
 import { configFields, NO_TIME_LIMIT_TEXT } from './configFields';
 

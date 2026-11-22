@@ -8,27 +8,25 @@ import { Linking } from 'react-native';
 export type LocationAccess = {
   /** 위치(앱 사용 중) 권한. 없으면 러닝을 기록할 수 없다. */
   foreground: boolean;
-  /** 위치(항상 허용) 권한. 없어도 기록은 되지만 기기에 따라 화면이 꺼지면 끊길 수 있다. */
-  background: boolean;
   /** 폰의 위치 서비스(GPS)가 켜져 있는지 */
   servicesEnabled: boolean;
 };
 
 export async function getLocationAccess(): Promise<LocationAccess> {
-  const [foreground, background, servicesEnabled] = await Promise.all([
+  const [foreground, servicesEnabled] = await Promise.all([
     Location.getForegroundPermissionsAsync(),
-    Location.getBackgroundPermissionsAsync(),
     Location.hasServicesEnabledAsync(),
   ]);
-  return { foreground: foreground.granted, background: background.granted, servicesEnabled };
+  return { foreground: foreground.granted, servicesEnabled };
 }
 
-/** 위치 권한을 순서대로 요청한다(안드로이드는 '앱 사용 중'을 먼저 받아야 '항상 허용'을 물을 수 있다). */
+/**
+ * 위치 권한('앱 사용 중')을 요청한다.
+ * '항상 허용'은 요청하지 않는다. 러닝은 알림을 띄운 포그라운드 서비스로 기록해서
+ * '앱 사용 중' 권한만으로 화면이 꺼져도 위치를 받는다. 필요 없는 권한은 받지 않는다(Q-007).
+ */
 export async function requestLocationAccess(): Promise<LocationAccess> {
-  const foreground = await Location.requestForegroundPermissionsAsync();
-  if (foreground.granted) {
-    await Location.requestBackgroundPermissionsAsync();
-  }
+  await Location.requestForegroundPermissionsAsync();
   return getLocationAccess();
 }
 
