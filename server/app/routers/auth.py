@@ -3,9 +3,11 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Cookie, Header, Response, status
+from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.deps import DbSession
+from app.errors import AppError, app_error_response
 from app.models import User
 from app.schemas.auth import AuthOut, LoginIn, RefreshIn, SignupIn, TokenOut, UserOut
 from app.services import auth_service
@@ -17,6 +19,7 @@ REFRESH_COOKIE = "pr_refresh"
 # 쿠키는 토큰을 다루는 주소로 갈 때만 붙는다(다른 API 요청에는 실리지 않는다)
 REFRESH_COOKIE_PATH = "/api/v1/auth"
 COOKIE_MODE = "cookie"
+SECONDS_PER_DAY = 24 * 60 * 60
 
 # 웹은 이 헤더를 "cookie"로 보낸다. 그러면 리프레시 토큰을 응답 본문에 넣지 않고
 # 자바스크립트가 읽을 수 없는 쿠키로만 준다. 앱은 헤더 없이 본문으로 받는다(D-006).
@@ -34,7 +37,7 @@ def _deliver(response: Response, tokens: TokenPair, mode: str | None) -> TokenOu
     response.set_cookie(
         REFRESH_COOKIE,
         tokens.refresh_token,
-        max_age=settings.refresh_token_days * 24 * 60 * 60,
+        max_age=settings.refresh_token_days * SECONDS_PER_DAY,
         path=REFRESH_COOKIE_PATH,
         httponly=True,
         secure=settings.cookie_secure,
@@ -68,10 +71,18 @@ def refresh(
     body: RefreshIn | None = None,
     cookie_token: RefreshCookie = None,
     mode: RefreshMode = None,
-) -> TokenOut:
+) -> TokenOut | JSONResponse:
     # 쿠키 방식(웹)은 쿠키의 토큰만 쓴다. 본문 토큰을 함께 받으면 어느 쪽이 맞는지 모호해진다.
     token = cookie_token if mode == COOKIE_MODE else (body.refresh_token if body else None)
-    _, tokens = auth_service.refresh(db, token)
+    try:
+        tokens = auth_service.refresh(db, token)
+    except AppError as error:
+        if mode != COOKIE_MODE:
+            raise
+        # 못 쓰는 토큰이 든 쿠키를 브라우저에 남겨 두지 않는다(다음 요청마다 같은 실패를 되풀이하지 않게)
+        failed = app_error_response(error)
+        failed.delete_cookie(REFRESH_COOKIE, path=REFRESH_COOKIE_PATH)
+        return failed
     return _deliver(response, tokens, mode)
 
 

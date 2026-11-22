@@ -4,7 +4,8 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.user import WEEKLY_GOAL_MAX, WEEKLY_GOAL_MIN
 
-# argon2는 긴 입력도 받지만, 너무 긴 비밀번호로 서버를 느리게 만드는 요청을 막으려고 상한을 둔다
+# 상한 72는 해시 방식의 제약이 아니라 우리가 정한 값이다(argon2는 더 긴 입력도 받는다).
+# 아주 긴 비밀번호를 보내 해시 계산으로 서버를 느리게 만드는 요청을 막으려는 것.
 PASSWORD_MIN = 8
 PASSWORD_MAX = 72
 

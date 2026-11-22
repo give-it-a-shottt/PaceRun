@@ -16,7 +16,11 @@ logger = logging.getLogger("pacerun")
 
 
 class AppError(Exception):
-    """서비스가 던지는 "예상한 실패". 라우터가 아니라 서비스가 던지므로 HTTP를 몰라도 되게 코드만 갖는다."""
+    """서비스가 던지는 "예상한 실패"(이미 가입된 이메일, 틀린 비밀번호 등).
+
+    응답으로 바꾸는 일은 아래 핸들러 한 곳이 맡는다. 그래서 서비스는 상태 코드 · 코드 · 문구만 정해 던지면 되고,
+    요청 · 응답 객체나 쿠키를 다룰 필요가 없다.
+    """
 
     def __init__(self, status_code: int, code: str, message: str) -> None:
         super().__init__(message)
@@ -25,8 +29,9 @@ class AppError(Exception):
         self.message = message
 
 
-def unauthorized(message: str = "로그인이 필요해요", code: str = "UNAUTHORIZED") -> AppError:
-    return AppError(status.HTTP_401_UNAUTHORIZED, code, message)
+def unauthorized(message: str = "로그인이 필요해요") -> AppError:
+    """액세스 토큰이 없거나 못 쓰는 경우의 401. (로그인 · 갱신 실패는 코드가 달라 서비스가 직접 만든다)"""
+    return AppError(status.HTTP_401_UNAUTHORIZED, "UNAUTHORIZED", message)
 
 
 def _body(code: str, message: str, **extra: object) -> dict[str, object]:
@@ -41,11 +46,16 @@ _STATUS_CODES = {
 }
 
 
+def app_error_response(error: AppError) -> JSONResponse:
+    """AppError를 응답으로 바꾼다. 라우터가 응답에 쿠키 삭제 같은 것을 더해야 할 때도 이 함수를 쓴다."""
+    headers = {"WWW-Authenticate": "Bearer"} if error.status_code == status.HTTP_401_UNAUTHORIZED else None
+    return JSONResponse(_body(error.code, error.message), status_code=error.status_code, headers=headers)
+
+
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def handle_app_error(_: Request, error: AppError) -> JSONResponse:
-        headers = {"WWW-Authenticate": "Bearer"} if error.status_code == status.HTTP_401_UNAUTHORIZED else None
-        return JSONResponse(_body(error.code, error.message), status_code=error.status_code, headers=headers)
+        return app_error_response(error)
 
     @app.exception_handler(RequestValidationError)
     async def handle_validation(_: Request, error: RequestValidationError) -> JSONResponse:

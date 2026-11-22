@@ -11,7 +11,8 @@
 - 주소 앞부분: `/api/v1`
 - 인증: `Authorization: Bearer <액세스 토큰>`. "인증" 칸이 O인 요청에 필요하다.
 - 에러 형식: `{"detail": {"code": "대문자_코드", "message": "사용자에게 보여 줄 말"}}`. 입력 오류(422)는 `fields: [{field, message}]`가 더 붙는다.
-- 공통 에러: 401 `UNAUTHORIZED`(토큰 없음 · 만료 · 틀림), 404 `NOT_FOUND`, 422 `VALIDATION`, 500 `INTERNAL`.
+- 공통 에러: 401 `UNAUTHORIZED`(토큰 없음 · 만료 · 틀림), 403 `FORBIDDEN`, 404 `NOT_FOUND`, 405 `METHOD_NOT_ALLOWED`, 422 `VALIDATION`, 500 `INTERNAL`. 그 밖의 HTTP 오류는 `HTTP_ERROR`.
+- `/api/v1` 밖: `GET /health` → 200 `{"status": "ok"}` (서버가 떠 있는지 확인용, 인증 없음)
 
 ### 인증
 
@@ -30,7 +31,11 @@
 - 리프레시 토큰을 받는 방식은 두 가지다(D-006).
   - 앱(기본): 응답 본문의 `refresh_token`으로 받고, 갱신 · 로그아웃 때 본문에 넣어 보낸다.
   - 웹(쿠키 방식): signup · login · refresh 요청에 `X-Refresh-Mode: cookie` 헤더를 붙인다. 그러면 본문의 `refresh_token`은 null이고 httpOnly 쿠키 `pr_refresh`(경로 `/api/v1/auth`, SameSite=Lax)로만 온다. 요청은 쿠키를 싣도록 보낸다(fetch `credentials: "include"`). logout은 쿠키의 토큰을 폐기하고 쿠키를 지운다.
-- 한 번 쓴 리프레시 토큰은 다시 쓸 수 없다. 이미 쓴 토큰이 다시 오면 그 회원의 토큰을 모두 폐기한다(다시 로그인해야 함).
+- 한 번 쓴 리프레시 토큰은 다시 쓸 수 없다(401 `INVALID_REFRESH`).
+  - 교체된 지 10초가 넘은 토큰이 다시 오면 새어 나간 것으로 보고 그 회원의 토큰을 모두 폐기한다(모든 기기에서 다시 로그인).
+  - 교체된 지 10초 안이면 같은 사용자의 동시 요청(브라우저 탭 2개 등)으로 보고 401만 준다. 다른 토큰은 그대로다.
+  - 로그아웃한 토큰은 지워지므로 다시 와도 401만 준다.
+  - 쿠키 방식에서 갱신이 401이면 서버가 `pr_refresh` 쿠키도 지운다.
 
 ### 러닝
 

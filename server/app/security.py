@@ -12,8 +12,7 @@ from app.config import get_settings
 
 _password_hash = PasswordHash.recommended()  # argon2id
 
-# 가입하지 않은 이메일로 로그인해도 해시 검증에 걸리는 시간이 같게 하려고 미리 만들어 둔 해시.
-# (응답 시간으로 "가입된 이메일인지" 알아내는 것을 막는다)
+# burn_password_check가 쓰는 가짜 해시. 서버가 뜰 때 한 번 만든다.
 _DUMMY_HASH = _password_hash.hash(secrets.token_urlsafe(16))
 
 
@@ -21,8 +20,13 @@ def hash_password(password: str) -> str:
     return _password_hash.hash(password)
 
 
-def verify_password(password: str, password_hash: str | None) -> bool:
-    return _password_hash.verify(password, password_hash or _DUMMY_HASH) and password_hash is not None
+def verify_password(password: str, password_hash: str) -> bool:
+    return _password_hash.verify(password, password_hash)
+
+
+def burn_password_check(password: str) -> None:
+    """가입하지 않은 이메일로 로그인했을 때, 실제 검증과 같은 시간을 쓰기만 한다(결과는 버린다)."""
+    _password_hash.verify(password, _DUMMY_HASH)
 
 
 def create_access_token(user_id: uuid.UUID, now: datetime | None = None) -> tuple[str, int]:
