@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
@@ -42,6 +42,14 @@ function useReduceMotion(): boolean {
   return reduceMotion;
 }
 
+/**
+ * 지나온 칸 · 남은 칸. 진행 채움 때문에 띠 전체가 매초 다시 그려지는데,
+ * 이 칸들은 값이 그대로면 다시 그리지 않게 따로 떼어 기억해 둔다(칸은 198개까지 된다).
+ */
+const PlainCell = memo(function PlainCell({ grow, height, color }: { grow: number; height: number; color: string }) {
+  return <View style={[styles.cell, { flexGrow: grow, height, backgroundColor: color }]} />;
+});
+
 /** 인터벌 구간 띠. 받은 값을 그리기만 한다: 지나온 칸 · 지금 칸(테두리 + 진행 채움) · 남은 칸. */
 export function Lane({ lane }: { lane: LaneView }) {
   const { colors } = useTheme();
@@ -79,7 +87,7 @@ export function Lane({ lane }: { lane: LaneView }) {
 
           if (index !== lane.currentIndex) {
             const color = index < lane.currentIndex ? colors.laneDone : colors.lineLight;
-            return <View key={index} style={[styles.cell, size, { backgroundColor: color }]} />;
+            return <PlainCell key={index} grow={size.flexGrow} height={size.height} color={color} />;
           }
 
           return (

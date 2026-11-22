@@ -16,29 +16,24 @@ const MARKER_WIDTH = 4;
 const MARKER_HEIGHT = 24;
 const MARKER_RADIUS = 2;
 
-/** 트랙 한쪽 끝은 목표에서 허용 범위의 6배만큼 벗어난 페이스다. 그보다 더 벗어나면 끝에 붙여 둔다. */
-const RANGE_IN_TOLERANCES = 6;
-const BAND_WIDTH_PERCENT = 100 / RANGE_IN_TOLERANCES;
-
-/** 마커의 가로 위치(0 = 왼쪽 끝 '느림', 100 = 오른쪽 끝 '빠름'). 재는 중이면 null. */
-function markerPercent(gauge: GaugeView): number | null {
-  if (gauge.gapSec == null) return null;
-  const range = gauge.toleranceSec * RANGE_IN_TOLERANCES;
-  const clamped = Math.min(range, Math.max(-range, gauge.gapSec));
-  return 50 - (clamped / range) * 50;
-}
-
 /** 페이스메이커의 목표 띠 게이지. 받은 값을 그리기만 하고, 글자(gauge.text)를 항상 함께 보여 준다. */
 export function PaceGauge({ gauge }: { gauge: GaugeView }) {
   const { colors } = useTheme();
-  const marker = markerPercent(gauge);
+  // 위치 · 너비는 계산돼서 온다(domain/runView의 gaugeFor). 여기서는 퍼센트로 바꿔 그리기만 한다.
+  const marker = gauge.markerRatio == null ? null : gauge.markerRatio * 100;
+  const band = gauge.bandRatio * 100;
 
   return (
     <View accessible accessibilityLabel={gauge.text} style={styles.root}>
       <View style={styles.gauge}>
         <View style={styles.area}>
           <View style={[styles.track, { backgroundColor: colors.lineLight }]} />
-          <View style={[styles.band, { backgroundColor: colors.primarySoft, borderColor: colors.laneDone }]} />
+          <View
+            style={[
+              styles.band,
+              { left: `${50 - band / 2}%`, width: `${band}%`, backgroundColor: colors.primarySoft, borderColor: colors.laneDone },
+            ]}
+          />
           {marker == null ? null : (
             <View style={[styles.marker, { left: `${marker}%`, backgroundColor: colors.iconMain }]} />
           )}
@@ -76,8 +71,6 @@ const styles = StyleSheet.create({
   band: {
     position: 'absolute',
     top: (AREA_HEIGHT - BAND_HEIGHT) / 2,
-    left: `${50 - BAND_WIDTH_PERCENT / 2}%`,
-    width: `${BAND_WIDTH_PERCENT}%`,
     height: BAND_HEIGHT,
     borderWidth: 1,
     borderRadius: BAND_RADIUS,

@@ -13,7 +13,7 @@
 |---|---|---|
 | runs | id TEXT PK(UUID) · mode · config_json · plan_label · started_at · ended_at · status · elapsed_ms · distance_m · avg_pace_s_per_km · counted · sync_state · updated_at | 러닝 1건. status = active / paused / finished. counted = 10분 인정 여부. sync_state = local / synced |
 | run_points | id PK · run_id FK · t · lat · lng · accuracy · elapsed_ms | 위치 점. 약 1초마다 1줄 |
-| run_segments | run_id FK · idx · kind · started_elapsed_ms · duration_ms · distance_m (PK run_id+idx) | 구간 기록. kind = run / walk(인터벌) 또는 km(1km 구간) |
+| run_segments | run_id FK · idx · kind · started_elapsed_ms · duration_ms · distance_m (PK run_id+idx) | 구간 기록. kind = run / walk(인터벌) 또는 km(1km 구간). 인터벌을 모두 마친 뒤 더 뛰면 그 뒤는 km 구간으로 이어진다(idx는 이어서 증가). 타이머가 늦어 건너뛴 인터벌 구간은 거리 0으로 남긴다 |
 | plan_items | weekday PK(0=월 … 6=일) · mode · config_json · label | 매주 반복되는 계획 1개. 요일당 운동 1개 |
 | settings | key PK · value(JSON) | 주 목표, 알림 시간, 음성 안내, 기본 케이던스, 러닝 화면 테마, 온보딩 완료, 마지막 설정, 마지막 동기화 |
 | active_run | id PK(항상 1) · state_json · saved_at | 진행 중인 러닝의 계산 상태 한 벌. 러닝 중 약 1초마다 덮어쓰고 끝나면 지운다. 앱이 꺼졌다 켜졌을 때 복구에 쓴다(스키마 2단계) |

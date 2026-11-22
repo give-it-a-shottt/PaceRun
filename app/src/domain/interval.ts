@@ -16,18 +16,23 @@ export type IntervalStep = {
 export function buildIntervalSteps(config: IntervalConfig): IntervalStep[] {
   const steps: IntervalStep[] = [];
   let startMs = 0;
-  for (let round = 0; round < config.repeats; round++) {
-    for (const kind of ['run', 'walk'] as const) {
-      const durationMs = (kind === 'run' ? config.runSec : config.walkSec) * 1000;
-      steps.push({ idx: steps.length, kind, startMs, durationMs });
-      startMs += durationMs;
-    }
+  for (let idx = 0; idx < intervalStepCount(config); idx++) {
+    const shape = intervalStepShape(config, idx);
+    steps.push({ idx, ...shape, startMs });
+    startMs += shape.durationMs;
   }
   return steps;
 }
 
-export function intervalTotalMs(config: IntervalConfig): number {
-  return (config.runSec + config.walkSec) * config.repeats * 1000;
+/** idx번째 구간의 종류와 길이. 일정의 규칙(짝수 = 달리기, 홀수 = 걷기)은 이 파일에만 둔다. */
+export function intervalStepShape(config: IntervalConfig, idx: number): { kind: IntervalKind; durationMs: number } {
+  const kind: IntervalKind = idx % 2 === 0 ? 'run' : 'walk';
+  return { kind, durationMs: (kind === 'run' ? config.runSec : config.walkSec) * 1000 };
+}
+
+/** 전체 구간 수(달리기 + 걷기) */
+export function intervalStepCount(config: IntervalConfig): number {
+  return config.repeats * 2;
 }
 
 export type IntervalPosition = {
@@ -45,9 +50,9 @@ export type IntervalPosition = {
 
 /** 경과 시간으로 지금 구간을 찾는다. 타이머가 늦게 불려 구간을 건너뛰었어도 답은 같다. */
 export function intervalPositionAt(config: IntervalConfig, elapsedMs: number): IntervalPosition {
-  const stepMs = { run: config.runSec * 1000, walk: config.walkSec * 1000 };
+  const stepMs = { run: intervalStepShape(config, 0).durationMs, walk: intervalStepShape(config, 1).durationMs };
   const roundMs = stepMs.run + stepMs.walk;
-  const total = config.repeats * 2;
+  const total = intervalStepCount(config);
   if (elapsedMs >= roundMs * config.repeats) {
     return { step: null, next: null, remainingMs: 0, progress: 1, total };
   }

@@ -9,6 +9,7 @@ import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-aud
 import * as Speech from 'expo-speech';
 
 import { disposePlayer } from './audioPlayers';
+import { SILENCE_SOUND } from './sounds';
 
 /** duck = 안내 동안 음악을 낮춘다 / mix = 낮추지 않고 섞는다(메트로놈이 계속 울리는 케이던스 모드) */
 export type VoiceMixing = 'duck' | 'mix';
@@ -76,7 +77,7 @@ export async function releaseVoice(): Promise<void> {
 function startDucking(): void {
   try {
     if (!duckPlayer) {
-      duckPlayer = createAudioPlayer(require('@/assets/audio/silence.wav'));
+      duckPlayer = createAudioPlayer(SILENCE_SOUND);
       duckPlayer.loop = true;
     }
     duckPlayer.play();

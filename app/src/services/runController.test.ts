@@ -73,6 +73,7 @@ async function setup(options: { voiceEnabled?: boolean } = {}) {
   notification.stopRunControl.mockResolvedValue(undefined);
   voice.prepareVoice.mockResolvedValue(undefined);
   voice.releaseVoice.mockResolvedValue(undefined);
+  metronome.startMetronome.mockReturnValue(true);
 
   useSettingsStore.setState({
     settings: { ...DEFAULT_SETTINGS, voiceEnabled: options.voiceEnabled ?? true },
@@ -305,6 +306,17 @@ describe('발걸음 박자(메트로놈)', () => {
     const { controller, metronome } = await setup();
     await controller.startRunSession(FREE, null);
     expect(metronome.startMetronome).not.toHaveBeenCalled();
+  });
+
+  it('박자 소리를 켜지 못하면 화면에 알리고 러닝은 계속한다', async () => {
+    const { controller, metronome, useRunStore, useToastStore } = await setup();
+    metronome.startMetronome.mockReturnValue(false);
+
+    const result = await controller.startRunSession(CADENCE, null);
+
+    expect(result.ok).toBe(true);
+    expect(useRunStore.getState().run).not.toBeNull();
+    expect(useToastStore.getState().message).toContain('박자 소리를 켜지 못했어요');
   });
 
   it('일시정지하면 끄고, 재개하면 다시 켠다', async () => {
@@ -566,6 +578,24 @@ describe('강제 종료 복구', () => {
     expect(location.stopLocationUpdates).toHaveBeenCalledTimes(1);
     expect(notification.stopRunControl).toHaveBeenCalledTimes(1);
     expect(repo.closeOrphanRuns).toHaveBeenCalledTimes(1);
+  });
+
+  it('남은 것을 끄는 사이 새 러닝이 시작되면, 방금 만든 러닝을 "남은 러닝"으로 닫지 않는다', async () => {
+    const { controller, repo, location } = await setup();
+    // 위치 끄기가 오래 걸리는 동안 사용자가 시작을 누른다
+    let finishStopping: () => void = () => {};
+    location.stopLocationUpdates.mockReturnValueOnce(new Promise<void>((resolve) => (finishStopping = resolve)));
+
+    const checking = controller.checkPendingRun();
+    await flush();
+    const started = await controller.startRunSession(FREE, null);
+    expect(started.ok).toBe(true);
+
+    finishStopping();
+    const pending = await checking;
+
+    expect(repo.closeOrphanRuns).not.toHaveBeenCalled();
+    expect(pending).toMatchObject({ stillRunning: true });
   });
 
   it('남은 러닝을 닫지 못해도 홈은 그대로 쓸 수 있다', async () => {

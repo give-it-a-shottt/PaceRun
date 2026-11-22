@@ -9,6 +9,7 @@ import {
   intervalPositionAt,
   type IntervalConfig,
   type IntervalKind,
+  type IntervalPosition,
 } from './interval';
 import { PACE_TOLERANCE_SEC, paceGapSec } from './modeCues';
 import { averagePaceSecPerKm } from './pace';
@@ -43,7 +44,14 @@ export type GaugeView = {
   toleranceSec: number;
   /** "+8초 느림" / "5초 빠름" / "목표 페이스" / "페이스를 재는 중" — 색만으로 알리지 않기 위한 글자 */
   text: string;
+  /** 마커의 가로 위치 0(왼쪽 끝 = 느림) ~ 1(오른쪽 끝 = 빠름). 재는 중이면 null */
+  markerRatio: number | null;
+  /** 목표 띠의 너비(트랙 전체가 1) */
+  bandRatio: number;
 };
+
+/** 게이지의 한쪽 끝은 목표에서 허용 범위의 이 배수만큼 벗어난 페이스다(±60초). 더 벗어나면 끝에 붙여 둔다. */
+const GAUGE_RANGE_IN_TOLERANCES = 6;
 
 export type RunView = {
   /** 맨 위 작은 제목(계획 이름 또는 모드 이름) */
@@ -82,11 +90,13 @@ const PACE_CAPTION_GPS_LOST = '평균 페이스 · 잠시 멈춤';
 export function describeRun(state: RunState, now: number): RunView {
   const elapsed = elapsedMs(state, now);
   const config = state.config;
+  // 인터벌의 "지금 구간"은 한 번만 구해 큰 숫자 · 구간 띠 · 일시정지 문구가 함께 쓴다
+  const position = config.mode === 'interval' ? intervalPositionAt(config, elapsed) : null;
 
   return {
     title: state.planLabel ?? MODE_LABEL[config.mode],
     elapsedText: `경과 ${formatDuration(elapsed)}`,
-    ...primaryFor(state, now, elapsed),
+    ...primaryFor(state, now, elapsed, position),
     distanceText: `${formatDistanceKm(state.distanceM)} km`,
     distanceCaption: state.gpsLost ? DISTANCE_CAPTION_GPS_LOST : DISTANCE_CAPTION,
     paceText: `${formatPace(averagePaceSecPerKm(elapsed, state.distanceM))}/km`,
@@ -94,21 +104,21 @@ export function describeRun(state: RunState, now: number): RunView {
     lastCue: state.lastCueDisplay,
     gpsLost: state.gpsLost,
     paused: state.status === 'paused',
-    pausedText: pausedTextFor(config, elapsed),
-    lane: config.mode === 'interval' ? laneFor(config, elapsed) : null,
+    pausedText: pausedTextFor(position),
+    lane: config.mode === 'interval' && position ? laneFor(config, position) : null,
     gauge: config.mode === 'pacemaker' ? gaugeFor(state, config) : null,
   };
 }
 
 type Primary = Pick<RunView, 'primaryLabel' | 'primaryValue' | 'secondaryText'>;
 
-function primaryFor(state: RunState, now: number, elapsed: number): Primary {
+function primaryFor(state: RunState, now: number, elapsed: number, position: IntervalPosition | null): Primary {
   const config = state.config;
   switch (config.mode) {
     case 'free':
       return countdownPrimary('자유 러닝', config.targetDurationSec, state, now, elapsed, (target) => `목표 ${formatDuration(target * 1000)}`);
     case 'interval':
-      return intervalPrimary(config, state, now, elapsed);
+      return intervalPrimary(position ?? intervalPositionAt(config, elapsed), state, now, elapsed);
     case 'cadence':
       return countdownPrimary('발걸음 박자', config.durationSec, state, now, elapsed, () => `분당 ${config.spm}걸음`);
     case 'pacemaker':
@@ -144,8 +154,7 @@ function countdownPrimary(
   return elapsedPrimary('목표를 채웠어요 · 경과 시간', state, now, elapsed);
 }
 
-function intervalPrimary(config: IntervalConfig, state: RunState, now: number, elapsed: number): Primary {
-  const position = intervalPositionAt(config, elapsed);
+function intervalPrimary(position: IntervalPosition, state: RunState, now: number, elapsed: number): Primary {
   if (!position.step) return elapsedPrimary('인터벌 완료 · 경과 시간', state, now, elapsed);
   const next = position.next;
   return {
@@ -155,11 +164,22 @@ function intervalPrimary(config: IntervalConfig, state: RunState, now: number, e
   };
 }
 
-function laneFor(config: IntervalConfig, elapsed: number): LaneView {
-  const position = intervalPositionAt(config, elapsed);
+/** 구간 목록은 목표값에만 달려 있다. 매초 새 배열을 만들지 않게 목표값마다 한 번만 만들어 둔다. */
+const laneStepsCache = new WeakMap<IntervalConfig, LaneView['steps']>();
+
+function laneSteps(config: IntervalConfig): LaneView['steps'] {
+  let steps = laneStepsCache.get(config);
+  if (!steps) {
+    steps = buildIntervalSteps(config).map((step) => ({ kind: step.kind, durationMs: step.durationMs }));
+    laneStepsCache.set(config, steps);
+  }
+  return steps;
+}
+
+function laneFor(config: IntervalConfig, position: IntervalPosition): LaneView {
   const current = position.step?.idx ?? position.total;
   return {
-    steps: buildIntervalSteps(config).map((step) => ({ kind: step.kind, durationMs: step.durationMs })),
+    steps: laneSteps(config),
     currentIndex: current,
     progress: position.progress,
     countText: `${Math.min(current + 1, position.total)} / ${position.total} 구간`,
@@ -181,21 +201,29 @@ function pacemakerPrimary(config: PacemakerConfig, state: RunState, now: number,
 
 function gaugeFor(state: RunState, config: PacemakerConfig): GaugeView {
   const gap = paceGapSec(state, config);
-  return { gapSec: gap, toleranceSec: PACE_TOLERANCE_SEC, text: gaugeText(gap) };
+  const range = PACE_TOLERANCE_SEC * GAUGE_RANGE_IN_TOLERANCES;
+  return {
+    gapSec: gap,
+    toleranceSec: PACE_TOLERANCE_SEC,
+    text: gaugeText(gap),
+    // 느릴수록(gap이 클수록) 왼쪽
+    markerRatio: gap == null ? null : 0.5 - Math.min(range, Math.max(-range, gap)) / range / 2,
+    bandRatio: 1 / GAUGE_RANGE_IN_TOLERANCES,
+  };
 }
 
 function gaugeText(gap: number | null): string {
   if (gap == null) return '페이스를 재는 중';
+  // 음성 안내(modeCues)와 같은 기준으로 가른다: 허용 범위를 조금이라도 넘으면 벗어난 것
+  if (Math.abs(gap) <= PACE_TOLERANCE_SEC) return '목표 페이스';
   const seconds = Math.round(Math.abs(gap));
-  if (seconds <= PACE_TOLERANCE_SEC) return '목표 페이스';
   return gap > 0 ? `+${seconds}초 느림` : `${seconds}초 빠름`;
 }
 
 const SAVING_NOTE = '기록은 계속 저장되고 있어요.';
 
-function pausedTextFor(config: RunConfig, elapsed: number): string {
-  if (config.mode !== 'interval') return SAVING_NOTE;
-  const step = intervalPositionAt(config, elapsed).step;
+function pausedTextFor(position: IntervalPosition | null): string {
+  const step = position?.step;
   return step ? `${INTERVAL_KIND_LABEL[step.kind]} 구간이 남았어요. ${SAVING_NOTE}` : SAVING_NOTE;
 }
 

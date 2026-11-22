@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildIntervalSteps, intervalPositionAt, intervalTotalMs } from './interval';
+import { buildIntervalSteps, intervalPositionAt } from './interval';
 import { applyLocation, finish, pause, resume, startRun, tick, type RunState } from './runEngine';
 import { describeRun } from './runView';
 import type { RunConfig } from './types';
@@ -40,7 +40,7 @@ describe('인터벌 일정', () => {
     expect(steps[0]).toEqual({ idx: 0, kind: 'run', startMs: 0, durationMs: 60_000 });
     expect(steps[1]).toEqual({ idx: 1, kind: 'walk', startMs: 60_000, durationMs: 90_000 });
     expect(steps[15]).toMatchObject({ kind: 'walk', startMs: 1_110_000 });
-    expect(intervalTotalMs(INTERVAL)).toBe(1_200_000);
+    expect(steps.reduce((sum, step) => sum + step.durationMs, 0)).toBe(1_200_000);
   });
 
   it('경과 5분 42초는 5번째 구간(달리기)이고 18초가 남았다', () => {
@@ -91,6 +91,66 @@ describe('인터벌 안내', () => {
     const done = tick(state, T0 + 1_200_000, OPTIONS);
     expect(done.cues.map((c) => c.speech)).toEqual(['인터벌을 모두 마쳤어요. 수고했어요']);
     expect(tick(done.state, T0 + 1_201_000, OPTIONS).cues).toEqual([]);
+  });
+
+  it('구간 막바지에 처음 불리면 "10초 뒤" 예고를 하지 않는다(이미 틀린 말이다)', () => {
+    // 첫 달리기(60초)의 59초 지점에 처음 불림: 1초 남음
+    const late = tick(start(INTERVAL), T0 + 59_000, OPTIONS);
+    expect(modeSpeeches(late.cues)).toEqual(['달리기. 1분']);
+    // 다음 구간이 시작되면 그 안내가 나온다
+    expect(modeSpeeches(tick(late.state, T0 + 60_000, OPTIONS).cues)).toEqual(['걷기. 1분 30초']);
+  });
+
+  it('예고할 때를 2~3초 넘긴 정도면 예고한다', () => {
+    const state = tick(start(INTERVAL), T0 + 40_000, OPTIONS).state;
+    // 50초(10초 전)에 불리지 못하고 53초에 불림
+    expect(modeSpeeches(tick(state, T0 + 53_000, OPTIONS).cues)).toEqual(['10초 뒤 걷기']);
+  });
+
+  it('일시정지가 구간 경계를 걸쳐도 같은 안내를 다시 말하지 않고 구간 기록이 이어진다', () => {
+    // 첫 달리기 55초 지점에서 멈췄다가 5분 뒤 재개
+    let state = run(start(INTERVAL), 0, 55, 3).state;
+    state = pause(state, T0 + 55_000).state;
+    const resumed = resume(state, T0 + 355_000);
+    state = resumed.state;
+
+    // 재개 직후: 아직 첫 구간(5초 남음). 시작 안내 · 10초 전 예고는 이미 했으므로 다시 나오지 않는다
+    expect(modeSpeeches(tick(state, T0 + 356_000, OPTIONS).cues)).toEqual([]);
+    // 5초 뒤 걷기 구간으로 넘어간다
+    const next = tick(state, T0 + 360_000, OPTIONS);
+    expect(modeSpeeches(next.cues)).toEqual(['걷기. 1분 30초']);
+    expect(next.state.segments).toHaveLength(1);
+    expect(next.state.segments[0]).toMatchObject({ idx: 0, kind: 'run', startedElapsedMs: 0, durationMs: 60_000 });
+    expect(next.state.openSegment).toMatchObject({ idx: 1, kind: 'walk', startedElapsedMs: 60_000 });
+  });
+
+  it('일정을 마친 뒤 더 뛰면 그 뒤에 지난 km 지점만 말한다', () => {
+    // 30초 달리기 + 30초 걷기 × 1, 초속 5m: 마칠 때 300m. 1km 지점은 200초
+    const short = { mode: 'interval', runSec: 30, walkSec: 30, repeats: 1 } as const;
+    const { speeches } = run(start(short), 0, 205, 5);
+    expect(speeches).toEqual([
+      '달리기. 30초',
+      '10초 뒤 걷기',
+      '걷기. 30초',
+      '10초 뒤 끝나요',
+      '인터벌을 모두 마쳤어요. 수고했어요',
+      '1킬로미터. 평균 페이스 3분 20초',
+    ]);
+  });
+
+  it('인터벌 중에 지나온 km 지점은 마친 뒤에 뒤늦게 말하지 않는다', () => {
+    // 초속 5m로 20분 인터벌: 마칠 때 6km. 마친 직후에는 완료 안내만 나온다
+    const { speeches } = run(start(INTERVAL), 1195, 1205, 5, 5975);
+    expect(speeches.filter((s) => s.includes('킬로미터'))).toEqual([]);
+    expect(speeches).toContain('인터벌을 모두 마쳤어요. 수고했어요');
+  });
+
+  it('목표값이 0이어도 오류 없이 바로 마친 것으로 본다', () => {
+    const empty = { mode: 'interval', runSec: 0, walkSec: 0, repeats: 0 } as const;
+    expect(intervalPositionAt(empty, 0)).toMatchObject({ step: null, total: 0 });
+    expect(buildIntervalSteps(empty)).toEqual([]);
+    expect(() => tick(start(empty), T0 + 1_000, OPTIONS)).not.toThrow();
+    expect(describeRun(start(empty), T0 + 1_000).lane).toMatchObject({ currentIndex: 0, countText: '0 / 0 구간' });
   });
 
   it('20초보다 짧은 구간은 10초 전 예고를 하지 않는다(시작 안내와 겹친다)', () => {
@@ -244,19 +304,87 @@ describe('페이스메이커', () => {
     const slow = run(start(PACEMAKER), 0, 40, 2);
     const fixed = run(slow.state, 41, 120, 2.5, slow.meters + 2.5);
     // 최근 30초가 목표 속도로 바뀐 뒤(약 70초 이후)에는 페이스 안내가 없다
-    expect(fixed.speeches.filter((s) => s.startsWith('조금')).length).toBeLessThanOrEqual(1);
+    const settled = run(fixed.state, 121, 200, 2.5, fixed.meters + 2.5);
+    expect(settled.speeches.filter((s) => s.startsWith('조금'))).toEqual([]);
     expect(describeRun(fixed.state, T0 + 120_000).gauge).toMatchObject({ text: '목표 페이스' });
   });
 
-  it('목표 거리를 채우면 한 번 알린다', () => {
-    const { speeches } = run(start({ ...PACEMAKER, distanceM: 1000 }), 0, 410, 2.5);
-    expect(speeches).toContain('목표 거리를 채웠어요');
+  it('GPS가 끊겨 지금 페이스를 모르면 페이스 안내를 멈춘다', () => {
+    // 느리게 뛰다가(안내가 나오던 중) 위치가 더 들어오지 않는다
+    const slow = run(start(PACEMAKER), 0, 40, 2);
+    let state = slow.state;
+    const speeches: string[] = [];
+    for (let sec = 41; sec <= 120; sec++) {
+      const stepped = tick(state, T0 + sec * 1000, OPTIONS);
+      state = stepped.state;
+      speeches.push(...stepped.cues.map((cue) => cue.speech));
+    }
+    expect(state.gpsLost).toBe(true);
+    expect(speeches.filter((s) => s.startsWith('조금'))).toEqual([]);
+    expect(describeRun(state, T0 + 120_000).gauge).toMatchObject({ gapSec: null, markerRatio: null, text: '페이스를 재는 중' });
+  });
+
+  it('목표 거리를 채우면 한 번 알리고, 그 뒤로는 페이스를 맞추라고 하지 않는다', () => {
+    // 목표 1km를 느린 속도(초속 2m)로: 채운 뒤에도 느리지만 "조금 빠르게"는 더 나오지 않는다
+    const { speeches } = run(start({ ...PACEMAKER, distanceM: 1000 }), 0, 620, 2);
     expect(speeches.filter((s) => s === '목표 거리를 채웠어요')).toHaveLength(1);
+    const doneAt = speeches.indexOf('목표 거리를 채웠어요');
+    expect(speeches.slice(doneAt + 1).filter((s) => s.startsWith('조금'))).toEqual([]);
+  });
+
+  it('목표 거리를 채운 뒤 더 뛰면 1km마다 거리 안내를 이어 간다', () => {
+    const { speeches } = run(start({ ...PACEMAKER, distanceM: 1250 }), 0, 810, 2.5);
+    // 1km(범위 안이라 km 안내) → 1.25km에서 목표 달성(500초) → 10분 인정(600초) → 2km 안내(800초)
+    expect(speeches).toEqual([
+      '1킬로미터. 평균 페이스 6분 40초',
+      '목표 거리를 채웠어요',
+      '오늘 1회 인정!',
+      '2킬로미터. 평균 페이스 6분 40초',
+    ]);
+  });
+
+  it('게이지 글자와 음성 안내는 같은 기준으로 갈린다(허용 범위를 조금만 넘어도 벗어난 것)', () => {
+    const withGap = (gap: number) => {
+      // 최근 표본 두 개로 원하는 페이스를 만든다: 30초 동안 30000 / (목표 + gap) km
+      const pace = PACEMAKER.targetPaceSecPerKm + gap;
+      const state = start(PACEMAKER);
+      return {
+        ...state,
+        distanceM: 30_000 / pace,
+        lastFixAt: T0 + 30_000,
+        paceSamples: [
+          { elapsedMs: 0, distanceM: 0 },
+          { elapsedMs: 30_000, distanceM: 30_000 / pace },
+        ],
+      };
+    };
+    expect(describeRun(withGap(10), T0 + 30_000).gauge?.text).toBe('목표 페이스');
+    expect(describeRun(withGap(10.4), T0 + 30_000).gauge?.text).toBe('+10초 느림');
+    expect(describeRun(withGap(-10.4), T0 + 30_000).gauge?.text).toBe('10초 빠름');
+    expect(modeSpeeches(tick(withGap(10.4), T0 + 30_000, OPTIONS).cues)).toEqual(['조금 빠르게. 목표보다 10초 느려요']);
+    expect(modeSpeeches(tick(withGap(10), T0 + 30_000, OPTIONS).cues)).toEqual([]);
+  });
+
+  it('게이지의 마커는 느릴수록 왼쪽, 빠를수록 오른쪽이고 ±60초에서 끝에 붙는다', () => {
+    const slow = describeRun(run(start(PACEMAKER), 0, 40, 2).state, T0 + 40_000).gauge;
+    expect(slow?.markerRatio).toBe(0); // 100초 느림 → 왼쪽 끝
+    const fast = describeRun(run(start(PACEMAKER), 0, 40, 3).state, T0 + 40_000).gauge;
+    expect(fast?.markerRatio).toBe(1); // 67초 빠름 → 오른쪽 끝
+    const onTarget = describeRun(run(start(PACEMAKER), 0, 40, 2.5).state, T0 + 40_000).gauge;
+    expect(onTarget?.markerRatio).toBeCloseTo(0.5, 2);
+    // 목표 띠는 ±10초 = 전체(±60초)의 6분의 1
+    expect(onTarget?.bandRatio).toBeCloseTo(1 / 6, 5);
   });
 
   it('게이지에 목표와의 차이를 글자로도 준다', () => {
     const measuring = describeRun(start(PACEMAKER), T0 + 5_000);
-    expect(measuring.gauge).toEqual({ gapSec: null, toleranceSec: 10, text: '페이스를 재는 중' });
+    expect(measuring.gauge).toEqual({
+      gapSec: null,
+      toleranceSec: 10,
+      text: '페이스를 재는 중',
+      markerRatio: null,
+      bandRatio: 1 / 6,
+    });
     expect(measuring.primaryValue).toBe(`-'--"`);
 
     const slow = describeRun(run(start(PACEMAKER), 0, 40, 2).state, T0 + 40_000);

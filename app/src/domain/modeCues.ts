@@ -8,7 +8,13 @@
  * - 페이스메이커: 최근 20~30초 평균이 목표에서 ±10초를 벗어나면 알림(같은 안내는 최소 30초 간격), 안 벗어나면 1km마다만
  */
 import { formatDuration, speakDistanceKm, speakDuration, speakPace } from './format';
-import { INTERVAL_KIND_LABEL, intervalPositionAt, type IntervalConfig } from './interval';
+import {
+  INTERVAL_KIND_LABEL,
+  intervalPositionAt,
+  intervalStepCount,
+  intervalStepShape,
+  type IntervalConfig,
+} from './interval';
 import { averagePaceSecPerKm, recentPaceSecPerKm } from './pace';
 // runEngine이 이 파일을 부르므로, 여기서는 runEngine의 타입만 가져온다(값을 가져오면 서로를 부르는 고리가 된다)
 import type { Cue, RunSegment, RunState, StepOptions } from './runEngine';
@@ -24,6 +30,10 @@ export type ModeResult = {
 
 /** 구간이 이보다 짧으면 "10초 전 예고"를 하지 않는다(시작 안내와 겹친다). */
 export const INTERVAL_WARN_BEFORE_MS = 10_000;
+/** 안내 문장에 넣는 숫자. 위 상수에서 만들어, 따로 적지 않는다. */
+const WARN_SECONDS = INTERVAL_WARN_BEFORE_MS / 1000;
+/** 예고할 때를 이만큼 넘겨서 처음 불렸으면 예고를 건너뛴다 */
+const INTERVAL_WARN_LATE_MS = 3_000;
 const INTERVAL_WARN_MIN_STEP_MS = 20_000;
 
 /** 케이던스 모드에서 시간 · 거리를 말하는 간격 */
@@ -40,7 +50,7 @@ export function modeCues(state: RunState, elapsed: number, options: StepOptions)
     case 'free':
       return freeCues(state, config, elapsed, options);
     case 'interval':
-      return intervalCues(state, config, elapsed);
+      return intervalCues(state, config, elapsed, options);
     case 'cadence':
       return cadenceCues(state, config, elapsed);
     case 'pacemaker':
@@ -68,6 +78,22 @@ export function kmCue(km: number, elapsed: number): Cue {
   };
 }
 
+/**
+ * 목표(인터벌 일정 · 목표 거리)를 채운 뒤 더 뛸 때의 거리 안내.
+ * 채운 순간까지 지나온 km 지점은 말하지 않는다 — 그동안 말하지 않고 지나온 지점이 뒤늦게 튀어나오지 않게,
+ * 채운 순간의 km 수를 메모해 두고 그보다 뒤의 지점만 말한다.
+ */
+function cuesAfterGoal(
+  state: RunState,
+  elapsed: number,
+  stepKm: number,
+): { cues: Cue[]; memo?: Record<string, number> } {
+  const passedKm = Math.floor(state.distanceM / 1000);
+  const goalKm = state.modeMemo.goalKm;
+  if (goalKm == null) return { cues: [], memo: { goalKm: passedKm } };
+  return { cues: passedKm > goalKm ? distanceCues(state, elapsed, stepKm) : [] };
+}
+
 type FreeConfig = Extract<RunConfig, { mode: 'free' }>;
 
 function freeCues(state: RunState, config: FreeConfig, elapsed: number, options: StepOptions): ModeResult {
@@ -81,14 +107,16 @@ function freeCues(state: RunState, config: FreeConfig, elapsed: number, options:
 
 // ---------------------------------------------------------------- 인터벌
 
-function intervalCues(state: RunState, config: IntervalConfig, elapsed: number): ModeResult {
+function intervalCues(state: RunState, config: IntervalConfig, elapsed: number, options: StepOptions): ModeResult {
   const position = intervalPositionAt(config, elapsed);
   const segments = intervalSegments(state, config, elapsed, position.step?.idx ?? position.total);
   const cues: Cue[] = [];
 
   if (!position.step) {
     cues.push({ key: 'interval-done', speech: '인터벌을 모두 마쳤어요. 수고했어요', display: '인터벌을 모두 마쳤어요' });
-    return { cues, segments };
+    // 일정을 마친 뒤 더 뛰면 자유 러닝처럼 거리 안내만 이어 간다(Q-009)
+    const after = cuesAfterGoal(state, elapsed, options.voiceIntervalKm);
+    return { cues: [...cues, ...after.cues], segments, memo: after.memo };
   }
 
   const { step, next } = position;
@@ -99,14 +127,12 @@ function intervalCues(state: RunState, config: IntervalConfig, elapsed: number):
     display: `${label} ${formatDuration(step.durationMs)}`,
   });
 
-  // 끝나기 10초 전 예고. 타이머가 늦어 이미 지나갔으면(남은 시간이 0에 가까우면) 다음 구간 시작 안내가 대신한다.
-  if (step.durationMs >= INTERVAL_WARN_MIN_STEP_MS && position.remainingMs <= INTERVAL_WARN_BEFORE_MS) {
-    const upcoming = next ? INTERVAL_KIND_LABEL[next.kind] : '끝';
-    cues.push({
-      key: `interval-${step.idx}-warn`,
-      speech: next ? `10초 뒤 ${upcoming}` : '10초 뒤 끝나요',
-      display: next ? `10초 뒤 ${upcoming}` : '10초 뒤 끝나요',
-    });
+  // 끝나기 10초 전 예고. 타이머가 늦게 불려 예고할 때를 놓쳤으면(이미 몇 초밖에 안 남았으면) 말하지 않는다 —
+  // "10초 뒤"가 틀린 말이 된다. 곧 나올 다음 구간 시작 안내가 대신한다.
+  const sinceWarnMs = INTERVAL_WARN_BEFORE_MS - position.remainingMs;
+  if (step.durationMs >= INTERVAL_WARN_MIN_STEP_MS && sinceWarnMs >= 0 && sinceWarnMs <= INTERVAL_WARN_LATE_MS) {
+    const text = next ? `${WARN_SECONDS}초 뒤 ${INTERVAL_KIND_LABEL[next.kind]}` : `${WARN_SECONDS}초 뒤 끝나요`;
+    cues.push({ key: `interval-${step.idx}-warn`, speech: text, display: text });
   }
   return { cues, segments };
 }
@@ -124,16 +150,15 @@ function intervalSegments(
   const open = state.openSegment;
   if (open.kind === 'km' || open.idx >= currentIdx) return undefined;
 
-  const stepMs = { run: config.runSec * 1000, walk: config.walkSec * 1000 };
-  const total = config.repeats * 2;
+  const total = intervalStepCount(config);
   const closed: RunSegment[] = [];
   let startedElapsedMs = open.startedElapsedMs;
   // 타이머가 늦어 여러 구간을 한꺼번에 넘었으면, 그동안 뛴 거리는 첫 구간에 넣는다(구간별로 나눌 근거가 없다)
   let distance = Math.max(0, state.distanceM - open.startDistanceM);
   for (let idx = open.idx; idx < currentIdx; idx++) {
-    const kind = idx % 2 === 0 ? 'run' : 'walk';
-    closed.push({ idx, kind, startedElapsedMs, durationMs: stepMs[kind], distanceM: distance });
-    startedElapsedMs += stepMs[kind];
+    const { kind, durationMs } = intervalStepShape(config, idx);
+    closed.push({ idx, kind, startedElapsedMs, durationMs, distanceM: distance });
+    startedElapsedMs += durationMs;
     distance = 0;
   }
 
@@ -142,7 +167,7 @@ function intervalSegments(
     segments: [...state.segments, ...closed],
     openSegment: {
       idx: currentIdx,
-      kind: finished ? 'km' : currentIdx % 2 === 0 ? 'run' : 'walk',
+      kind: finished ? 'km' : intervalStepShape(config, currentIdx).kind,
       startedElapsedMs: finished ? startedElapsedMs : Math.min(startedElapsedMs, elapsed),
       startDistanceM: state.distanceM,
     },
@@ -182,7 +207,10 @@ export function paceGapSec(state: RunState, config: PacemakerConfig): number | n
 
 function pacemakerCues(state: RunState, config: PacemakerConfig, elapsed: number): ModeResult {
   if (state.distanceM >= config.distanceM) {
-    return { cues: [{ key: 'pacemaker-done', speech: '목표 거리를 채웠어요', display: '목표 거리를 채웠어요' }] };
+    // 목표를 채운 뒤에는 페이스를 맞추라고 하지 않는다. 더 뛰면 1km마다 거리 안내만 이어 간다(Q-009).
+    const after = cuesAfterGoal(state, elapsed, 1);
+    const done: Cue = { key: 'pacemaker-done', speech: '목표 거리를 채웠어요', display: '목표 거리를 채웠어요' };
+    return { cues: [done, ...after.cues], memo: after.memo };
   }
 
   const gap = paceGapSec(state, config);

@@ -81,13 +81,16 @@ async function refreshSettings(): Promise<void> {
   stepOptions = { voiceIntervalKm: settings.voiceIntervalKm };
 }
 
+const METRONOME_FAILED_MESSAGE = '박자 소리를 켜지 못했어요. 일시정지했다가 재개해 보세요';
+
 /**
  * 박자 소리를 지금 상태에 맞춘다: 케이던스 모드로 뛰는 중일 때만 울리고, 일시정지 · 종료 · 다른 모드에서는 끈다.
  * 상태가 바뀌는 곳마다 부르면 되고, 여러 번 불러도 결과가 같다.
  */
 function syncMetronome(): void {
   if (state && !finishing && state.status === 'active' && state.config.mode === 'cadence') {
-    startMetronome(state.config.spm);
+    // 박자 모드에서 박자가 안 나는 것은 뛰는 중에 알아채기 어렵다. 화면에라도 알린다.
+    if (!startMetronome(state.config.spm)) showToast(METRONOME_FAILED_MESSAGE);
   } else {
     stopMetronome();
   }
@@ -303,6 +306,8 @@ export function finishRunSession(): Promise<RunSummary | null> {
   if (!state) return Promise.resolve(null);
   finishing = finishCurrentRun(state).finally(() => {
     finishing = null;
+    // 끝내지 못해 러닝이 이어지면 박자를 다시 켠다(끝났으면 러닝이 비어 있어 꺼진 채로 남는다)
+    syncMetronome();
   });
   return finishing;
 }
@@ -319,9 +324,8 @@ async function finishCurrentRun(current: RunState): Promise<RunSummary | null> {
     await saveFinishedRun(summary, unsavedPoints);
   } catch (error) {
     console.warn('[runController] 러닝을 끝내지 못했어요', error);
+    // 끝내지 못했으니 러닝은 이어진다(박자는 finishRunSession이 finishing을 푼 뒤 다시 맞춘다)
     startTimer();
-    // 끝내지 못했으니 러닝은 이어진다. finishing이 풀린 뒤에 박자를 다시 맞춘다.
-    setTimeout(syncMetronome, 0);
     return null;
   }
 
@@ -366,6 +370,9 @@ export async function checkPendingRun(): Promise<PendingRun | null> {
     // 러닝이 없는데 위치 작업 · 알림만 남아 있을 수 있다(지난번에 끄지 못한 경우).
     // 복구할 방법이 없는 '진행 중' 러닝이 남아 있으면 끝난 것으로 닫는다.
     await stopStrayTracking();
+    // 끄는 사이 새 러닝이 시작됐으면 그 러닝을 닫으면 안 된다
+    // (방금 만든 러닝은 아직 복구 상태가 저장되지 않아 '남은 러닝'처럼 보인다)
+    if (state || starting) return checkPendingRun();
     await closeOrphanRuns().catch((error) => {
       console.warn('[runController] 남아 있던 러닝을 닫지 못했어요', error);
     });

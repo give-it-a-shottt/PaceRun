@@ -241,7 +241,7 @@ export function tick(state: RunState, now: number, options: StepOptions): StepRe
   }
 
   const mode = modeCues(next, elapsed, options);
-  next = { ...next, modeMemo: { ...next.modeMemo, ...mode.memo } };
+  if (mode.memo) next = { ...next, modeMemo: { ...next.modeMemo, ...mode.memo } };
   if (mode.segments) next = { ...next, segments: mode.segments.segments, openSegment: mode.segments.openSegment };
   cues.push(...mode.cues);
 
