@@ -46,12 +46,23 @@
 | GET /runs | O | 쿼리 `limit`(1~100, 기본 20), `cursor` | 200 `{items: RunSummary[], next_cursor}` | |
 | GET /runs/{id} | O | — | 200 `RunDetail` | 404 `RUN_NOT_FOUND`(없거나 남의 것) |
 
-- `RunIn` = `{mode, config, plan_label, started_at, ended_at, elapsed_s, distance_m, avg_pace_s_per_km, counted, segments, route}`
+- `RunIn` = `{mode, config, plan_label, started_at, ended_at, elapsed_s, distance_m, avg_pace_s_per_km, segments, route}`. `counted`는 받지 않는다 — 서버가 `elapsed_s ≥ 600`(10분)으로 정한다. 모르는 칸이 있으면 422다.
 - `RunSummary` = `{id, mode, config, plan_label, started_at, ended_at, elapsed_s, distance_m, avg_pace_s_per_km, counted}`
 - `RunDetail` = `RunSummary` + `{segments, route}`
-- mode ∈ free · interval · cadence · pacemaker. started_at · ended_at은 시간대가 붙은 ISO 8601.
+- mode ∈ free · interval · cadence · pacemaker. started_at · ended_at은 시간대가 붙은 ISO 8601(시간대가 없으면 422). ended_at은 started_at보다 빠를 수 없다.
+- config는 모드에 맞는 모양이어야 한다(폰 DB의 camelCase 칸을 snake_case로 바꾼 것).
+
+  | mode | config |
+  |---|---|
+  | free | `{target_duration_sec}` (초, 제한 없으면 null) |
+  | interval | `{run_sec, walk_sec, repeats}` (repeats 1~99) |
+  | cadence | `{spm, duration_sec}` (spm 120~220) |
+  | pacemaker | `{target_pace_s_per_km, distance_m}` |
+
+- 크기 상한: elapsed_s 86400(24시간), distance_m 300000, plan_label 50자, segments 1000개, route 20000점. 넘으면 422.
 - route는 `[lat, lng, elapsed_s]` 배열(최대 20000개), segments는 `{idx, kind, started_elapsed_s, duration_s, distance_m}` 배열.
-- 목록은 started_at 최신순. `next_cursor`가 null이면 끝이다.
+- 목록은 started_at 최신순(같으면 id 순). `next_cursor`는 다음 쪽을 달라고 할 때 그대로 돌려보내는 값이고, null이면 끝이다. 모양이 틀린 cursor는 422.
+- PUT의 `{id}`가 UUID가 아니면 422. 다른 회원이 쓰는 번호면 409이고 원래 기록은 바뀌지 않는다.
 
 ### 통계 (웹 대시보드)
 
@@ -60,7 +71,9 @@
 | GET /stats | O | 쿼리 `period`(month · year), `anchor`(YYYY-MM-DD, 기본 오늘), `tz`(기본 Asia/Seoul) | 200 `StatsOut` |
 
 - `StatsOut` = `{period, start, end, buckets: [{label, start, distance_m, count, elapsed_s}], totals: {distance_m, count, elapsed_s}, goal_weeks: {achieved, total}, weekly_goal}`
-- month는 날짜별, year는 월별 묶음이다. count는 10분 인정된 러닝 수다.
-- goal_weeks는 기간과 겹치는 주(월요일 시작) 가운데 인정 횟수가 주 목표 이상인 주의 수다.
+- month는 날짜별(기록 없는 날도 0으로 채움, label = 날짜 숫자), year는 월별 12칸(label = "1월"…)이다. `start`는 기간 첫날, `end`는 기간 끝 다음 날이다.
+- distance_m · elapsed_s는 모든 러닝의 합이고, count는 10분 인정된 러닝 수다.
+- 하루와 한 주의 경계는 `tz`의 시각으로 나눈다. 모르는 시간대 이름이면 422.
+- goal_weeks.total은 기간과 겹치는 주(월요일 시작) 가운데 이미 시작한 주의 수, achieved는 그중 인정 횟수가 주 목표(지금의 `weekly_goal`) 이상인 주의 수다. 기간 밖으로 걸친 주는 그 주 전체(월~일)의 횟수로 본다.
 
 최종 수정: 2026-11-22 · 관련: F-008, F-009, D-006, D-007

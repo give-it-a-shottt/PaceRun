@@ -11,6 +11,7 @@ dependencies = [
     "pydantic-settings>=2.16.3",
     "pyjwt>=2.15.1",
     "sqlalchemy>=2",
+    "tzdata>=2026.6",
     "uvicorn[standard]>=0.54.0",
 ]
 
@@ -31,10 +32,10 @@ target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "S", "SIM"]
-# S101: 테스트의 assert / S105·S106: 테스트용 가짜 비밀번호
 [tool.ruff.lint.isort]
 # 레포에 alembic/ 폴더(마이그레이션)가 있어서 우리 코드로 오해한다. 설치한 패키지로 분류한다.
 known-third-party = ["alembic"]
 
+# S101: 테스트의 assert / S105·S106: 테스트용 가짜 비밀번호
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101", "S105", "S106"]

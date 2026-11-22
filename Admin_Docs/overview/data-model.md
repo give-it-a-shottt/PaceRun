@@ -53,9 +53,10 @@ settings 테이블의 키 (`app/src/domain/types.ts`의 `Settings`, 값은 JSON 
 |---|---|---|
 | users | id UUID PK · email(254자) · password_hash · weekly_goal · created_at | email UNIQUE(소문자로 저장), weekly_goal 2~5(기본 3) |
 | refresh_tokens | id UUID PK · user_id FK · token_hash(SHA-256, 64자) · expires_at · revoked_at · created_at | token_hash UNIQUE, user_id 인덱스(ix_refresh_tokens_user_id), user 삭제 시 함께 삭제. revoked_at은 교체된 시각(null이면 쓸 수 있음). 만료된 줄은 토큰을 새로 줄 때 지운다. 교체된 줄은 새어 나간 토큰을 알아채는 근거라 만료될 때까지 남긴다. 로그아웃은 줄을 지운다 |
-| runs | id UUID PK(폰이 만든 번호) · user_id FK · mode · config JSONB · plan_label · started_at · ended_at · elapsed_s · distance_m · avg_pace_s_per_km · counted · segments JSONB · route JSONB · created_at · updated_at | 인덱스 (user_id, started_at DESC) |
+| runs | id UUID PK(폰이 만든 번호) · user_id FK · mode · config JSONB · plan_label · started_at · ended_at · elapsed_s · distance_m · avg_pace_s_per_km · counted · segments JSONB · route JSONB · created_at · updated_at | 인덱스 ix_runs_user_started(user_id, started_at), user 삭제 시 함께 삭제. CHECK: mode 4가지, elapsed_s ≥ 0, distance_m ≥ 0, ended_at ≥ started_at. counted는 서버가 elapsed_s ≥ 600으로 정한다 |
 
 - route = `[[lat, lng, elapsed_s], …]`, segments = `[{idx, kind, started_elapsed_s, duration_s, distance_m}, …]`. 따로 테이블로 나누지 않고 한 칸에 둔다(D-007).
+- config(JSONB)는 모드별 목표값이고 칸 이름은 snake_case다(api-list.md "러닝"의 config 표).
 - 서버 시간은 timestamptz(UTC). 주 계산(월요일 0시 시작)은 요청의 시간대(tz)로 한다.
 
 ### 폰 ↔ 서버 이름 대응
