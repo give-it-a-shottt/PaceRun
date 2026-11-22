@@ -5,7 +5,7 @@
  */
 import { comparePace, previousComparable } from './compare';
 import { formatDistanceKm, formatDuration, formatPace } from './format';
-import { describeConfig, describeEstimate } from './runConfig';
+import { describeConfig, describeEstimate, estimatedDurationSec, QUICK_RUN_CONFIG } from './runConfig';
 import { MODE_LABEL } from './runView';
 import type { PlanItem, RunConfig, RunMode } from './types';
 import { DAYS_PER_WEEK, isSameDay, WEEKDAY_NAMES, weekdayIndex, weekLabel } from './week';
@@ -44,7 +44,15 @@ export type TodayCard =
       startLabel: string;
     }
   | { kind: 'noPlan'; mode: 'free'; title: string; message: string; startLabel: string; config: RunConfig }
-  | { kind: 'restDay'; mode: 'free'; title: string; message: string; quickRunLabel: string }
+  | {
+      kind: 'restDay';
+      mode: 'free';
+      title: string;
+      message: string;
+      quickRunLabel: string;
+      /** 쉬는 날에도 제대로 뛰고 싶을 때 누르는 글자 버튼(시작 전 설정을 연다) */
+      otherLabel: string;
+    }
   | {
       kind: 'done';
       runId: string;
@@ -78,8 +86,11 @@ export type HomeInput = {
   runs: readonly FinishedRun[];
 };
 
-/** 계획이 없는 날 권하는 운동 */
-export const NO_PLAN_CONFIG: RunConfig = { mode: 'free', targetDurationSec: 20 * 60 };
+/** 계획이 없는 날 권하는 운동: 자유 20분. 카드의 문구도 이 값에서 만든다. */
+const NO_PLAN_MINUTES = 20;
+export const NO_PLAN_CONFIG: RunConfig = { mode: 'free', targetDurationSec: NO_PLAN_MINUTES * 60 };
+/** [10분만 뛰기]의 분 수(쉬는 날 카드의 문구에 쓴다) */
+const QUICK_RUN_MINUTES = (estimatedDurationSec(QUICK_RUN_CONFIG) ?? 0) / 60;
 
 /** '왜 오늘 이걸' 한 줄. 모드마다 하나씩 */
 const REASONS: Record<RunMode, string> = {
@@ -139,9 +150,9 @@ function todayCard({ now, plan, runs }: HomeInput): TodayCard {
     return {
       kind: 'noPlan',
       mode: 'free',
-      title: '자유 20분',
-      message: '오늘은 계획이 없어요. 가볍게 20분 뛰어 볼까요? 계획 탭에서 이번 주 계획을 세울 수도 있어요.',
-      startLabel: '자유 20분 시작',
+      title: `자유 ${NO_PLAN_MINUTES}분`,
+      message: `오늘은 계획이 없어요. 가볍게 ${NO_PLAN_MINUTES}분 뛰어 볼까요? 계획 탭에서 이번 주 계획을 세울 수도 있어요.`,
+      startLabel: `자유 ${NO_PLAN_MINUTES}분 시작`,
       config: NO_PLAN_CONFIG,
     };
   }
@@ -151,13 +162,14 @@ function todayCard({ now, plan, runs }: HomeInput): TodayCard {
   if (item) return plannedCard(item, runs, now);
 
   // 다음 러닝을 찾지 못하면(계획의 요일 값이 망가진 경우) 그 문장만 뺀다
-  const sentences = [nextPlannedText(plan, runs, today), '몸이 가볍다면 10분만 뛰어도 1회로 인정돼요.'];
+  const sentences = [nextPlannedText(plan, runs, today), `몸이 가볍다면 ${QUICK_RUN_MINUTES}분만 뛰어도 1회로 인정돼요.`];
   return {
     kind: 'restDay',
     mode: 'free',
     title: '오늘은 쉬는 날이에요',
     message: sentences.filter(Boolean).join(' '),
-    quickRunLabel: '가볍게 10분 뛰기',
+    quickRunLabel: `가볍게 ${QUICK_RUN_MINUTES}분 뛰기`,
+    otherLabel: '다른 운동으로 뛰기',
   };
 }
 

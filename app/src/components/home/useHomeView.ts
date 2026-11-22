@@ -2,7 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
-import { addDays, startOfDay } from '@/domain/week';
+import { msUntilNextDay } from '@/domain/week';
 import { loadHome, type HomeView } from '@/services/homeData';
 import { useSettingsStore } from '@/state/settingsStore';
 
@@ -51,9 +51,15 @@ export function useHomeView() {
       const subscription = AppState.addEventListener('change', (appState) => {
         if (appState === 'active') reload();
       });
-      // 화면을 켜 둔 채 자정을 넘기는 경우: 다음 날 0시가 조금 지난 뒤 한 번 더 읽는다
-      const untilTomorrow = addDays(startOfDay(Date.now()), 1) - Date.now() + MIDNIGHT_MARGIN_MS;
-      const midnight = setTimeout(reload, untilTomorrow);
+      // 화면을 켜 둔 채 자정을 넘기는 경우: 다음 날 0시가 조금 지난 뒤 다시 읽고, 그다음 자정을 다시 기다린다
+      let midnight: ReturnType<typeof setTimeout>;
+      const waitForMidnight = () => {
+        midnight = setTimeout(() => {
+          reload();
+          waitForMidnight();
+        }, msUntilNextDay(Date.now()) + MIDNIGHT_MARGIN_MS);
+      };
+      waitForMidnight();
       return () => {
         subscription.remove();
         clearTimeout(midnight);

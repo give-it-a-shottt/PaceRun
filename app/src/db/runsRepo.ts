@@ -1,3 +1,4 @@
+import type { FinishedRun } from '@/domain/home';
 import type { RunPoint, RunSegment, RunState, RunSummary } from '@/domain/runEngine';
 import type { RunConfig, RunMode, RunStatus, SyncState } from '@/domain/types';
 
@@ -238,12 +239,6 @@ export async function listFinishedRuns(range?: { from: number; to: number }): Pr
   return rows.map(toRecord);
 }
 
-/** 끝난 러닝의 요약 칸만 담은 모양(목표값 config는 뺐다) */
-export type RunDigest = Pick<
-  RunRecord,
-  'id' | 'mode' | 'planLabel' | 'startedAt' | 'elapsedMs' | 'distanceM' | 'avgPaceSecPerKm' | 'counted'
->;
-
 type DigestRow = Pick<
   RunRow,
   'id' | 'mode' | 'plan_label' | 'started_at' | 'elapsed_ms' | 'distance_m' | 'avg_pace_s_per_km' | 'counted'
@@ -254,7 +249,7 @@ type DigestRow = Pick<
  * 화면이 보일 때마다 부르므로 필요한 칸만 읽고, 목표값(config_json)은 읽지도 풀지도 않는다 —
  * 그 칸이 망가진 줄 하나 때문에 홈 전체가 읽기 실패가 되는 일도 막는다.
  */
-export async function listRunDigests(): Promise<RunDigest[]> {
+export async function listRunDigests(): Promise<FinishedRun[]> {
   const db = await getDb();
   const rows = await db.getAllAsync<DigestRow>(
     "SELECT id, mode, plan_label, started_at, elapsed_ms, distance_m, avg_pace_s_per_km, counted FROM runs WHERE status = 'finished'",

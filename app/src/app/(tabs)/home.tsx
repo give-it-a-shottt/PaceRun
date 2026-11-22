@@ -97,7 +97,15 @@ export default function HomeScreen() {
           </>
         );
       case 'restDay':
-        return quickRunButton(today.quickRunLabel);
+        return (
+          <>
+            {quickRunButton(today.quickRunLabel)}
+            {/* 피그마에는 이 버튼 하나뿐이다. 쉬는 날에도 다른 운동을 고를 길이 막히지 않게 글자 버튼을 둔다. */}
+            <View style={styles.links}>
+              <TextLink label={today.otherLabel} onPress={() => openSheet({})} />
+            </View>
+          </>
+        );
       case 'done':
         return (
           <>

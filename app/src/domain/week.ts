@@ -48,3 +48,8 @@ export function weekLabel(time: number): string {
   const nth = Math.ceil(thursday.getDate() / DAYS_PER_WEEK);
   return `${thursday.getMonth() + 1}월 ${nth}주차`;
 }
+
+/** 지금부터 다음 날 0시까지 남은 시간(밀리초). 화면을 켜 둔 채 날짜가 바뀌는 순간을 맞추는 데 쓴다. */
+export function msUntilNextDay(now: number): number {
+  return addDays(startOfDay(now), 1) - now;
+}

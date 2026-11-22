@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { comparePace, previousComparable } from './compare';
 import { describeHome, nextSession, parsePlanLabel, type FinishedRun } from './home';
 import type { PlanItem } from './types';
-import { addDays, startOfDay, startOfWeek, weekdayIndex, weekLabel } from './week';
+import { addDays, msUntilNextDay, startOfDay, startOfWeek, weekdayIndex, weekLabel } from './week';
 import { streakText, weekCells, weekProgress } from './weekProgress';
 
 // 2026-11-26은 목요일이다. 그 주는 11-23(월) ~ 11-29(일).
@@ -61,6 +61,17 @@ describe('주 계산', () => {
     expect(weekLabel(at(11, 30))).toBe('12월 1주차');
     // 12-28(월) ~ 01-03(일)의 목요일은 12-31 → 12월 5주차
     expect(weekLabel(new Date(2027, 0, 2).getTime())).toBe('12월 5주차');
+  });
+
+  it('다음 날 0시까지 남은 시간', () => {
+    expect(msUntilNextDay(new Date(2026, 10, 26, 23, 59, 30).getTime())).toBe(30_000);
+    expect(msUntilNextDay(new Date(2026, 10, 26, 0, 0, 0).getTime())).toBe(24 * 3_600_000);
+  });
+
+  it('기록이 한참 비어 있다가 다시 뛰어도, 빈 주에서 끊고 더 거슬러 올라가지 않는다', () => {
+    // 지난주 3번, 그 앞 3주는 비어 있고, 한 달 전 주에 3번
+    const runs = [...[16, 18, 20].map((day) => run(at(11, day))), ...[19, 21, 23].map((day) => run(at(10, day)))];
+    expect(weekProgress(runs, 3, THURSDAY).previousStreak).toBe(1);
   });
 
   it('날짜 더하기는 0시를 유지한다', () => {
@@ -268,6 +279,7 @@ describe('오늘의 러닝 카드', () => {
       title: '오늘은 쉬는 날이에요',
       message: '다음 러닝은 토요일 인터벌 입문 3회차예요. 몸이 가볍다면 10분만 뛰어도 1회로 인정돼요.',
       quickRunLabel: '가볍게 10분 뛰기',
+      otherLabel: '다른 운동으로 뛰기',
     });
   });
 

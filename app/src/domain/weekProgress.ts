@@ -49,14 +49,19 @@ export function countedInWeek(runs: readonly RunMark[], weekStart: number): numb
  */
 export function weekProgress(runs: readonly RunMark[], weeklyGoal: number, now: number): WeekProgress {
   const thisWeek = startOfWeek(now);
-  const count = countedInWeek(runs, thisWeek);
+  // 러닝을 한 번만 훑어 주(월요일 0시)별 인정 횟수를 센다. 주마다 전체를 다시 훑지 않는다.
+  const perWeek = new Map<number, number>();
+  for (const run of runs) {
+    if (!run.counted) continue;
+    const week = startOfWeek(run.startedAt);
+    perWeek.set(week, (perWeek.get(week) ?? 0) + 1);
+  }
+  const count = perWeek.get(thisWeek) ?? 0;
   const met = count >= weeklyGoal;
 
-  // 가장 오래된 기록보다 앞선 주는 볼 필요가 없다. 기록이 없으면 반복도 없다.
-  const oldest = runs.reduce((min, run) => Math.min(min, run.startedAt), now);
+  // 지난주부터 거슬러 올라가며 목표를 채운 주를 센다. 못 채운 주(기록이 없는 주 포함)에서 멈춘다.
   let previousStreak = 0;
-  for (let week = addDays(thisWeek, -DAYS_PER_WEEK); week >= startOfWeek(oldest); week = addDays(week, -DAYS_PER_WEEK)) {
-    if (countedInWeek(runs, week) < weeklyGoal) break;
+  for (let week = addDays(thisWeek, -DAYS_PER_WEEK); (perWeek.get(week) ?? 0) >= weeklyGoal; week = addDays(week, -DAYS_PER_WEEK)) {
     previousStreak += 1;
   }
 

@@ -8,7 +8,7 @@ import { ReminderTimePicker, type ReminderChoice } from '@/components/onboarding
 import { TemplateCard } from '@/components/onboarding/TemplateCard';
 import { WeeklyGoalPicker } from '@/components/onboarding/WeeklyGoalPicker';
 import { DEFAULT_REMINDER_CLOCK, parseReminderTime, toReminderTime } from '@/domain/reminderTime';
-import type { Settings } from '@/domain/types';
+import { completeOnboarding } from '@/services/onboarding';
 import { requestNotificationAccess } from '@/services/permissions';
 import { useSettingsStore } from '@/state/settingsStore';
 
@@ -16,7 +16,6 @@ import { useSettingsStore } from '@/state/settingsStore';
 export default function GoalStep() {
   const savedGoal = useSettingsStore((s) => s.settings.weeklyGoal);
   const savedReminderTime = useSettingsStore((s) => s.settings.reminderTime);
-  const update = useSettingsStore((s) => s.update);
   // 화면이 처음 열릴 때의 값만 본다(저장하면서 true로 바뀌어도 고른 값이 바뀌지 않게)
   const [alreadyDone] = useState(() => useSettingsStore.getState().settings.onboardingDone);
 
@@ -48,26 +47,15 @@ export default function GoalStep() {
       }
     }
 
-    // update는 저장에 실패하면 그 값을 되돌리고 토스트를 띄운다(오류를 던지지 않는다). 그래서 하나씩 저장하고
-    // 남아 있는지 확인한다. 하나라도 저장되지 않았으면 이 화면에 남아 다시 누를 수 있게 한다 —
-    // "온보딩 끝"은 고른 값이 모두 저장된 뒤에만 적는다(고른 값이 사라진 채 홈으로 넘어가지 않게).
-    const saved = async <K extends 'weeklyGoal' | 'reminderTime' | 'onboardingDone'>(
-      key: K,
-      value: Settings[K],
-    ): Promise<boolean> => {
-      await update(key, value);
-      return useSettingsStore.getState().settings[key] === value;
-    };
-    const allSaved =
-      (await saved('weeklyGoal', goal)) && (await saved('reminderTime', reminderTime)) && (await saved('onboardingDone', true));
-    if (!allSaved) {
+    // 하나라도 저장되지 않았으면(토스트는 저장소가 띄운다) 이 화면에 남아 다시 누를 수 있게 한다
+    if (!(await completeOnboarding({ weeklyGoal: goal, reminderTime }))) {
       savingRef.current = false;
       setSaving(false);
       return;
     }
 
-    // replace로 가서 뒤로 가기로 온보딩에 돌아오지 않게 한다. 템플릿 선택 화면(PLN_01_003)은 아직 없어 계획 탭으로 보낸다.
-    router.replace(withTemplate ? '/plan' : '/home');
+    // replace로 가서 뒤로 가기로 온보딩에 돌아오지 않게 한다. 템플릿을 고른 채면 템플릿 선택 화면(PLN_01_003)으로 보낸다.
+    router.replace(withTemplate ? '/plan/templates' : '/home');
   };
 
   return (
