@@ -22,6 +22,8 @@ let mixing: VoiceMixing = 'duck';
 let duckPlayer: AudioPlayer | null = null;
 /** 아직 다 말하지 않은 안내 수. 0이 되면 음악 볼륨을 되돌린다. */
 let pending = 0;
+/** 말하는 중인 안내들의 시간 제한 타이머. 러닝이 끝나면 지운다(다음 러닝의 안내 수를 건드리지 않게). */
+const timeouts = new Set<ReturnType<typeof setTimeout>>();
 
 /** 러닝을 시작할 때 한 번 부른다. 실패해도 러닝은 계속돼야 하므로 오류를 던지지 않는다. */
 export async function prepareVoice(next: VoiceMixing): Promise<void> {
@@ -47,10 +49,12 @@ export function say(text: string): void {
     if (finished) return;
     finished = true;
     clearTimeout(timeout);
+    timeouts.delete(timeout);
     pending = Math.max(0, pending - 1);
     if (pending === 0) stopDucking();
   };
   const timeout = setTimeout(done, UTTERANCE_TIMEOUT_MS);
+  timeouts.add(timeout);
 
   try {
     Speech.speak(text, { language: VOICE_LANGUAGE, onDone: done, onStopped: done, onError: done });
@@ -64,6 +68,8 @@ export function say(text: string): void {
 /** 러닝이 끝나면 부른다. 말하던 안내를 멈추고 음악 볼륨을 되돌린다. */
 export async function releaseVoice(): Promise<void> {
   pending = 0;
+  for (const timeout of timeouts) clearTimeout(timeout);
+  timeouts.clear();
   try {
     await Speech.stop();
   } catch (error) {

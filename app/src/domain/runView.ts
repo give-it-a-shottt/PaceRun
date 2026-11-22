@@ -11,8 +11,7 @@ import {
   type IntervalKind,
   type IntervalPosition,
 } from './interval';
-import { PACE_TOLERANCE_SEC, paceGapSec } from './modeCues';
-import { averagePaceSecPerKm } from './pace';
+import { averagePaceSecPerKm, PACE_TOLERANCE_SEC, paceGapSec } from './pace';
 import { currentPaceSecPerKm, elapsedMs, msUntilCounted, type RunState } from './runEngine';
 import type { RunConfig, RunMode } from './types';
 
@@ -200,7 +199,7 @@ function pacemakerPrimary(config: PacemakerConfig, state: RunState, now: number,
 }
 
 function gaugeFor(state: RunState, config: PacemakerConfig): GaugeView {
-  const gap = paceGapSec(state, config);
+  const gap = paceGapSec(state.paceSamples, config.targetPaceSecPerKm);
   const range = PACE_TOLERANCE_SEC * GAUGE_RANGE_IN_TOLERANCES;
   return {
     gapSec: gap,

@@ -25,3 +25,12 @@ export function recentPaceSecPerKm(samples: readonly PaceSample[]): number | nul
   if (spanMs < PACE_MIN_SPAN_MS || moved <= 0) return null;
   return spanMs / 1000 / (moved / KM);
 }
+
+/** 페이스메이커: 목표 페이스에서 이만큼(km당 초)까지는 벗어난 것으로 보지 않는다 */
+export const PACE_TOLERANCE_SEC = 10;
+
+/** 목표보다 얼마나 느린지(km당 초). 양수 = 느림, 음수 = 빠름. 최근 페이스를 알 수 없으면 null */
+export function paceGapSec(samples: readonly PaceSample[], targetPaceSecPerKm: number): number | null {
+  const current = recentPaceSecPerKm(samples);
+  return current == null ? null : current - targetPaceSecPerKm;
+}

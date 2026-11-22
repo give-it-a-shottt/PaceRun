@@ -153,6 +153,19 @@ describe('재생기 정리', () => {
     expect(() => disposePlayer(broken as never)).not.toThrow();
     expect(() => disposePlayer(null)).not.toThrow();
   });
+
+  it('멈추기가 실패해도 놓아 주기까지 한다', async () => {
+    const { disposePlayer } = await setup();
+    const broken = fakePlayer();
+    broken.pause.mockImplementation(() => {
+      throw new Error('not playing');
+    });
+
+    disposePlayer(broken as never);
+
+    expect(broken.remove).toHaveBeenCalled();
+    expect(broken.release).toHaveBeenCalled();
+  });
 });
 
 describe('음성 안내와 음악 볼륨', () => {
@@ -258,6 +271,23 @@ describe('음성 안내와 음악 볼륨', () => {
 
     expect(speech.stop).toHaveBeenCalled();
     expect(players[0].release).toHaveBeenCalled();
+  });
+
+  it('끝낼 때 남은 15초 타이머를 지워, 바로 이어진 다음 러닝의 안내를 일찍 끝난 것으로 세지 않는다', async () => {
+    const { players, voice } = await setup();
+    await voice.prepareVoice('duck');
+    voice.say('신호가 오지 않는 안내'); // 다 말했다는 신호 없이 러닝이 끝난다
+    await voice.releaseVoice();
+
+    // 5초 뒤 새 러닝의 첫 안내. 무음 재생기는 새로 만들어진다(players[1])
+    vi.advanceTimersByTime(5_000);
+    voice.say('시작합니다');
+    // 옛 안내의 15초가 지나는 시점: 새 안내는 아직 말하는 중이므로 볼륨을 되돌리면 안 된다
+    vi.advanceTimersByTime(10_000);
+    expect(players[1].pause).not.toHaveBeenCalled();
+    // 새 안내 자신의 15초가 지나면 되돌린다
+    vi.advanceTimersByTime(5_000);
+    expect(players[1].pause).toHaveBeenCalledTimes(1);
   });
 
   it('음성을 멈추지 못해도 정리는 끝난다', async () => {

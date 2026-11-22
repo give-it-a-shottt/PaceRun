@@ -153,6 +153,24 @@ describe('인터벌 안내', () => {
     expect(describeRun(start(empty), T0 + 1_000).lane).toMatchObject({ currentIndex: 0, countText: '0 / 0 구간' });
   });
 
+  it('달리기만 0초여도 걷기 구간으로 바로 넘어가고 멈추지 않는다', () => {
+    const walkOnly = { mode: 'interval', runSec: 0, walkSec: 30, repeats: 2 } as const;
+    expect(intervalPositionAt(walkOnly, 0).step).toMatchObject({ idx: 1, kind: 'walk' });
+    expect(intervalPositionAt(walkOnly, 30_000).step).toMatchObject({ idx: 3, kind: 'walk' });
+    expect(intervalPositionAt(walkOnly, 60_000).step).toBeNull();
+    expect(() => run(start(walkOnly), 0, 65, 3)).not.toThrow();
+  });
+
+  it('다른 모드도 목표값이 0이면 오류 없이 바로 채운 것으로 본다', () => {
+    const cadence = tick(start({ mode: 'cadence', spm: 170, durationSec: 0 }), T0 + 1_000, OPTIONS);
+    expect(modeSpeeches(cadence.cues)).toEqual(['목표 시간을 채웠어요']);
+    expect(describeRun(cadence.state, T0 + 1_000).primaryLabel).toBe('목표를 채웠어요 · 경과 시간');
+
+    const pacemaker = tick(start({ mode: 'pacemaker', targetPaceSecPerKm: 400, distanceM: 0 }), T0 + 1_000, OPTIONS);
+    expect(modeSpeeches(pacemaker.cues)).toEqual(['목표 거리를 채웠어요']);
+    expect(describeRun(pacemaker.state, T0 + 1_000).primaryLabel).toBe('목표 거리를 채웠어요 · 경과 시간');
+  });
+
   it('20초보다 짧은 구간은 10초 전 예고를 하지 않는다(시작 안내와 겹친다)', () => {
     const { speeches } = run(start({ mode: 'interval', runSec: 15, walkSec: 15, repeats: 2 }), 0, 29, 3);
     expect(speeches).toEqual(['달리기. 15초', '걷기. 15초']);

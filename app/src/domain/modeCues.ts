@@ -15,7 +15,7 @@ import {
   intervalStepShape,
   type IntervalConfig,
 } from './interval';
-import { averagePaceSecPerKm, recentPaceSecPerKm } from './pace';
+import { averagePaceSecPerKm, PACE_TOLERANCE_SEC, paceGapSec } from './pace';
 // runEngine이 이 파일을 부르므로, 여기서는 runEngine의 타입만 가져온다(값을 가져오면 서로를 부르는 고리가 된다)
 import type { Cue, RunSegment, RunState, StepOptions } from './runEngine';
 import type { RunConfig } from './types';
@@ -39,8 +39,6 @@ const INTERVAL_WARN_MIN_STEP_MS = 20_000;
 /** 케이던스 모드에서 시간 · 거리를 말하는 간격 */
 export const CADENCE_REPORT_EVERY_MS = 5 * 60 * 1000;
 
-/** 목표 페이스에서 이만큼(km당 초) 넘게 벗어나면 알린다 */
-export const PACE_TOLERANCE_SEC = 10;
 /** 페이스 안내끼리의 최소 간격 */
 export const PACE_CUE_MIN_GAP_MS = 30_000;
 
@@ -199,12 +197,6 @@ function cadenceCues(state: RunState, config: CadenceConfig, elapsed: number): M
 
 type PacemakerConfig = Extract<RunConfig, { mode: 'pacemaker' }>;
 
-/** 목표보다 얼마나 느린지(km당 초). 양수 = 느림, 음수 = 빠름. 최근 페이스를 알 수 없으면 null */
-export function paceGapSec(state: RunState, config: PacemakerConfig): number | null {
-  const current = recentPaceSecPerKm(state.paceSamples);
-  return current == null ? null : current - config.targetPaceSecPerKm;
-}
-
 function pacemakerCues(state: RunState, config: PacemakerConfig, elapsed: number): ModeResult {
   if (state.distanceM >= config.distanceM) {
     // 목표를 채운 뒤에는 페이스를 맞추라고 하지 않는다. 더 뛰면 1km마다 거리 안내만 이어 간다(Q-009).
@@ -213,7 +205,7 @@ function pacemakerCues(state: RunState, config: PacemakerConfig, elapsed: number
     return { cues: [done, ...after.cues], memo: after.memo };
   }
 
-  const gap = paceGapSec(state, config);
+  const gap = paceGapSec(state.paceSamples, config.targetPaceSecPerKm);
   const lastCueAt = state.modeMemo.paceCueAt;
   const quietEnough = lastCueAt == null || elapsed - lastCueAt >= PACE_CUE_MIN_GAP_MS;
   if (gap != null && Math.abs(gap) > PACE_TOLERANCE_SEC && quietEnough) {

@@ -8,11 +8,12 @@ import type { AudioPlayer } from 'expo-audio';
  */
 export function disposePlayer(player: AudioPlayer | null): void {
   if (!player) return;
-  try {
-    player.pause();
-    player.remove();
-    player.release();
-  } catch (error) {
-    console.warn('[audio] 플레이어를 정리하지 못했어요', error);
+  // 한 단계가 실패해도 다음 단계는 해야 한다. 멈추지 못했다고 놓아 주기까지 건너뛰면 플레이어가 남는다.
+  for (const step of [() => player.pause(), () => player.remove(), () => player.release()]) {
+    try {
+      step();
+    } catch (error) {
+      console.warn('[audio] 플레이어를 정리하지 못했어요', error);
+    }
   }
 }

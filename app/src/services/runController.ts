@@ -237,7 +237,7 @@ function deliver(cues: Cue[]): void {
       try {
         say(cue.speech);
       } catch (error) {
-        // 안내를 말하지 못해도 계산 · 저장은 이어져야 한다
+        // say도 스스로 오류를 삼키지만, 안내 때문에 계산 · 저장이 끊기는 일은 없어야 해서 여기서도 막아 둔다
         console.warn('[runController] 안내를 말하지 못했어요', error);
       }
     }
