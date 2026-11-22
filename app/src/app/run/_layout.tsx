@@ -3,7 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 
 import { ThemeProvider } from '@/theme/ThemeContext';
 import { darkColors, lightColors } from '@/theme/tokens';
-import { useRunScheme } from '@/theme/useRunScheme';
+import { useRunScheme } from '@/state/useRunScheme';
 
 /** 러닝 화면 묶음(카운트다운 · 러닝 중 · 완료 요약). 앱에서 여기만 Dark가 될 수 있다. */
 export default function RunLayout() {

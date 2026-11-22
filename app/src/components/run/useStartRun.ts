@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { RunConfig } from '@/domain/types';
 import { hasGoodGpsFix } from '@/services/gps';
-import { getLocationAccess, requestLocationAccess } from '@/services/permissions';
+import { getLocationAccess, requestLocationAccess, requestNotificationAccess } from '@/services/permissions';
 import { useSettingsStore } from '@/state/settingsStore';
 
 /** idle = 기다리는 중 / checking = 위치 권한 · 첫 GPS 확인 중 / searchingGps = GPS 신호를 못 잡아 되풀이해 찾는 중 */
@@ -24,6 +24,8 @@ export type StartRequest = {
 /** 처음에는 짧게 보고, 못 잡으면 [그냥 시작]을 내놓은 뒤 더 길게 되풀이해 찾는다 */
 const FIRST_GPS_CHECK_MS = 3000;
 const GPS_RETRY_GAP_MS = 2000;
+/** 이만큼 되풀이해도 못 잡으면 그만 찾는다(약 2분). 안내와 [그냥 시작하기]는 그대로 남는다. */
+const MAX_GPS_RETRIES = 18;
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -83,16 +85,21 @@ export function useStartRun() {
           return;
         }
 
+        // 잠금화면의 [일시정지] 버튼은 알림 권한이 있어야 뜬다. 거절해도 러닝은 시작할 수 있다.
+        await requestNotificationAccess().catch(() => false);
+        if (cancelled()) return;
+
         let found = await hasGoodGpsFix(FIRST_GPS_CHECK_MS);
         if (cancelled()) return;
         if (!found) setPhase('searchingGps');
-        while (!found) {
+        for (let retry = 0; !found && retry < MAX_GPS_RETRIES; retry++) {
           await wait(GPS_RETRY_GAP_MS);
           if (cancelled()) return;
           found = await hasGoodGpsFix();
           if (cancelled()) return;
         }
-        proceed(request);
+        // 끝내 못 잡았으면 여기서 멈춘다. 화면에는 안내와 [그냥 시작하기]가 남아 있다.
+        if (found) proceed(request);
       } catch (error) {
         console.warn('[useStartRun] 위치 상태를 확인하지 못했어요', error);
         if (cancelled()) return;

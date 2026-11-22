@@ -2,7 +2,7 @@
  * 시작 전 설정 시트에서 조절하는 목표값 칸. 모드마다 어떤 값을 어떤 범위(CONFIG_LIMITS)로
  * 바꿀 수 있는지와, 한 칸 줄이거나 늘렸을 때의 설정을 만든다. 화면은 받은 값을 그리기만 한다.
  */
-import { formatPace, speakDuration } from '@/domain/format';
+import { formatKm, formatPace, speakDuration } from '@/domain/format';
 import { CONFIG_LIMITS } from '@/domain/runConfig';
 import type { RunConfig, RunMode } from '@/domain/types';
 
@@ -148,7 +148,6 @@ function cadenceFields(config: ConfigOf<'cadence'>): ConfigField[] {
 }
 
 function pacemakerFields(config: ConfigOf<'pacemaker'>): ConfigField[] {
-  const km = config.distanceM / 1000;
   return [
     numberField({
       key: 'targetPaceSecPerKm',
@@ -162,7 +161,7 @@ function pacemakerFields(config: ConfigOf<'pacemaker'>): ConfigField[] {
     numberField({
       key: 'distanceM',
       label: '거리',
-      valueText: `${Number.isInteger(km) ? km : km.toFixed(1)}km`,
+      valueText: formatKm(config.distanceM),
       value: config.distanceM,
       limit: CONFIG_LIMITS.pacemakerDistanceKm,
       unit: 1000,

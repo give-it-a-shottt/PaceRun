@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Animated, Easing } from 'react-native';
 
-import { vibrate } from '@/services/runController';
+import { vibrate } from '@/services/haptics';
 
 /** 실수로 눌리는 것을 막기 위한 대기 시간(pacerun-design.md 5장 모션 스펙). */
 export const HOLD_DURATION_MS = 1500;

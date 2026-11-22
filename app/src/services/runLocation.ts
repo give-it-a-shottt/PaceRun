@@ -10,9 +10,11 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 
 import type { LocationFix } from '@/domain/runEngine';
+import { lightColors } from '@/theme/tokens';
 
 const TASK_NAME = 'pacerun-run-location';
-const BRAND_COLOR = '#8E3B5A';
+// 알림 아이콘 색은 브랜드 색(primary/accent)
+const BRAND_COLOR = lightColors.primaryAccent;
 
 type Listener = (fixes: LocationFix[]) => void;
 

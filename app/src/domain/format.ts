@@ -25,6 +25,12 @@ export function formatDistanceKm(meters: number): string {
   return (Math.floor(Math.max(0, meters) / 10) / 100).toFixed(2);
 }
 
+/** 목표 거리 표기 "3km", "2.5km" (소수는 한 자리까지) */
+export function formatKm(meters: number): string {
+  const km = meters / 1000;
+  return `${Number.isInteger(km) ? km : km.toFixed(1)}km`;
+}
+
 /** 음성용 시간: 90초 → "1분 30초", 60초 → "1분", 45초 → "45초" */
 export function speakDuration(totalSec: number): string {
   const sec = Math.max(0, Math.round(totalSec));

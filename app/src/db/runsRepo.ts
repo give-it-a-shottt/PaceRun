@@ -1,7 +1,9 @@
 import type { RunPoint, RunSegment, RunState, RunSummary } from '@/domain/runEngine';
 import type { RunConfig, RunMode, RunStatus, SyncState } from '@/domain/types';
 
-import { getDb } from './database';
+import type { SQLiteDatabase } from 'expo-sqlite';
+
+import { getDb, withWriteTransaction } from './database';
 
 /** runs 테이블 한 줄을 화면 · 로직에서 쓰기 좋게 바꾼 모양 */
 export type RunRecord = {
@@ -52,17 +54,40 @@ function toRecord(row: RunRow): RunRecord {
 }
 
 export async function insertRun(state: RunState): Promise<void> {
-  const db = await getDb();
-  await db.runAsync(
-    `INSERT INTO runs (id, mode, config_json, plan_label, started_at, status, updated_at)
-     VALUES (?, ?, ?, ?, ?, 'active', ?)`,
-    state.runId,
-    state.config.mode,
-    JSON.stringify(state.config),
-    state.planLabel,
-    state.startedAt,
-    state.startedAt,
+  await withWriteTransaction((db) =>
+    db.runAsync(
+      `INSERT INTO runs (id, mode, config_json, plan_label, started_at, status, updated_at)
+       VALUES (?, ?, ?, ?, ?, 'active', ?)`,
+      state.runId,
+      state.config.mode,
+      JSON.stringify(state.config),
+      state.planLabel,
+      state.startedAt,
+      state.startedAt,
+    ),
   );
+}
+
+/** 시작하지 못한 러닝을 흔적 없이 지운다(위치 점 · 구간은 외래키로 함께 지워진다). */
+export async function deleteRun(runId: string): Promise<void> {
+  await withWriteTransaction(async (db) => {
+    await db.runAsync('DELETE FROM runs WHERE id = ?', runId);
+    await db.runAsync('DELETE FROM active_run WHERE id = 1');
+  });
+}
+
+async function insertPoints(db: SQLiteDatabase, runId: string, points: readonly RunPoint[]): Promise<void> {
+  for (const point of points) {
+    await db.runAsync(
+      'INSERT INTO run_points (run_id, t, lat, lng, accuracy, elapsed_ms) VALUES (?, ?, ?, ?, ?, ?)',
+      runId,
+      point.t,
+      point.lat,
+      point.lng,
+      point.accuracy,
+      Math.round(point.elapsedMs),
+    );
+  }
 }
 
 /**
@@ -76,8 +101,7 @@ export async function saveProgress(args: {
   now: number;
 }): Promise<void> {
   const { state, elapsedMs, points, now } = args;
-  const db = await getDb();
-  await db.withExclusiveTransactionAsync(async (txn) => {
+  await withWriteTransaction(async (txn) => {
     await txn.runAsync(
       'UPDATE runs SET status = ?, elapsed_ms = ?, distance_m = ?, counted = ?, updated_at = ? WHERE id = ?',
       state.status,
@@ -87,17 +111,7 @@ export async function saveProgress(args: {
       now,
       state.runId,
     );
-    for (const point of points) {
-      await txn.runAsync(
-        'INSERT INTO run_points (run_id, t, lat, lng, accuracy, elapsed_ms) VALUES (?, ?, ?, ?, ?, ?)',
-        state.runId,
-        point.t,
-        point.lat,
-        point.lng,
-        point.accuracy,
-        Math.round(point.elapsedMs),
-      );
-    }
+    await insertPoints(txn, state.runId, points);
     await txn.runAsync(
       `INSERT INTO active_run (id, state_json, saved_at) VALUES (1, ?, ?)
        ON CONFLICT (id) DO UPDATE SET state_json = excluded.state_json, saved_at = excluded.saved_at`,
@@ -109,19 +123,8 @@ export async function saveProgress(args: {
 
 /** 러닝을 끝낸 것으로 저장하고 복구용 상태를 지운다. */
 export async function saveFinishedRun(summary: RunSummary, points: readonly RunPoint[]): Promise<void> {
-  const db = await getDb();
-  await db.withExclusiveTransactionAsync(async (txn) => {
-    for (const point of points) {
-      await txn.runAsync(
-        'INSERT INTO run_points (run_id, t, lat, lng, accuracy, elapsed_ms) VALUES (?, ?, ?, ?, ?, ?)',
-        summary.runId,
-        point.t,
-        point.lat,
-        point.lng,
-        point.accuracy,
-        Math.round(point.elapsedMs),
-      );
-    }
+  await withWriteTransaction(async (txn) => {
+    await insertPoints(txn, summary.runId, points);
     await txn.runAsync(
       `UPDATE runs SET status = 'finished', ended_at = ?, elapsed_ms = ?, distance_m = ?,
          avg_pace_s_per_km = ?, counted = ?, sync_state = 'local', updated_at = ?

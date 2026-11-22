@@ -1,5 +1,5 @@
 /** 러닝 목표값(RunConfig)의 기본값 · 범위 · 설명 문구. 시작 전 설정, 계획, 홈 카드가 함께 쓴다. */
-import { formatPace, speakDuration } from './format';
+import { formatKm, formatPace, speakDuration } from './format';
 import type { RunConfig, RunMode } from './types';
 
 /** 목표값을 고를 때의 범위와 한 번에 바뀌는 크기 */
@@ -71,9 +71,4 @@ export function estimatedDurationSec(config: RunConfig): number | null {
 export function describeEstimate(config: RunConfig): string | null {
   const sec = estimatedDurationSec(config);
   return sec == null ? null : `약 ${Math.max(1, Math.round(sec / 60))}분`;
-}
-
-function formatKm(meters: number): string {
-  const km = meters / 1000;
-  return `${Number.isInteger(km) ? km : km.toFixed(1)}km`;
 }

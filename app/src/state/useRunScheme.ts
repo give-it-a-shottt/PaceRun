@@ -1,8 +1,8 @@
 import { useColorScheme } from 'react-native';
 
-import { useSettingsStore } from '@/state/settingsStore';
+import type { ThemeScheme } from '@/theme/ThemeContext';
 
-import type { ThemeScheme } from './ThemeContext';
+import { useSettingsStore } from './settingsStore';
 
 /**
  * 러닝 화면 묶음의 테마. 설정 '러닝 화면 테마'가 자동이면 OS의 다크 설정을 따르고,

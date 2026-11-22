@@ -6,6 +6,7 @@ import { DEFAULT_SETTINGS } from '@/domain/types';
 // 기기 기능(DB · 위치 · 알림 · 음성 · 진동)은 모두 가짜로 바꿔, 진행 관리자가
 // "언제 무엇을 부르는지"와 실패했을 때의 처리만 본다. 계산 자체는 runEngine 테스트가 맡는다.
 vi.mock('@/db/runsRepo', () => ({
+  deleteRun: vi.fn(),
   insertRun: vi.fn(),
   saveProgress: vi.fn(),
   saveFinishedRun: vi.fn(),
@@ -25,12 +26,7 @@ vi.mock('./runNotification', () => ({
 }));
 vi.mock('./voice', () => ({ prepareVoice: vi.fn(), releaseVoice: vi.fn(), say: vi.fn() }));
 vi.mock('expo-crypto', () => ({ randomUUID: () => 'run-uuid' }));
-vi.mock('expo-haptics', () => ({
-  impactAsync: vi.fn(() => Promise.resolve()),
-  notificationAsync: vi.fn(() => Promise.resolve()),
-  ImpactFeedbackStyle: { Medium: 'medium' },
-  NotificationFeedbackType: { Success: 'success' },
-}));
+vi.mock('./appVisibility', () => ({ isAppVisible: vi.fn(() => true) }));
 
 const T0 = 1_700_000_000_000;
 const DEG_PER_M = 1 / 111_194.9;
@@ -48,12 +44,17 @@ async function setup(options: { voiceEnabled?: boolean } = {}) {
   const location = vi.mocked(await import('./runLocation'));
   const notification = vi.mocked(await import('./runNotification'));
   const voice = vi.mocked(await import('./voice'));
+  const visibility = vi.mocked(await import('./appVisibility'));
   const { useSettingsStore } = await import('@/state/settingsStore');
   const { useRunStore } = await import('@/state/runStore');
   const { useToastStore } = await import('@/state/toastStore');
   const controller = await import('./runController');
+  // 진행 관리자는 읽히는 순간 위치 받을 곳을 등록한다(프로세스가 되살아났을 때도 받기 위해)
+  const listener = location.setLocationListener.mock.calls.at(-1)?.[0];
+  if (!listener) throw new Error('위치 리스너가 등록되지 않았어요');
 
   vi.clearAllMocks();
+  repo.deleteRun.mockResolvedValue(undefined);
   repo.insertRun.mockResolvedValue(undefined);
   repo.saveProgress.mockResolvedValue(undefined);
   repo.saveFinishedRun.mockResolvedValue(undefined);
@@ -62,6 +63,7 @@ async function setup(options: { voiceEnabled?: boolean } = {}) {
   location.startLocationUpdates.mockResolvedValue(undefined);
   location.stopLocationUpdates.mockResolvedValue(undefined);
   location.isLocationRunning.mockResolvedValue(false);
+  visibility.isAppVisible.mockReturnValue(true);
   notification.startRunControl.mockResolvedValue(undefined);
   notification.showRunControl.mockResolvedValue(undefined);
   notification.stopRunControl.mockResolvedValue(undefined);
@@ -74,13 +76,9 @@ async function setup(options: { voiceEnabled?: boolean } = {}) {
   });
 
   /** 진행 관리자가 위치 작업에 등록한 함수로 위치를 흘려 넣는다 */
-  const sendLocations = (fixes: LocationFix[]) => {
-    const listener = location.setLocationListener.mock.calls.at(-1)?.[0];
-    if (!listener) throw new Error('위치 리스너가 등록되지 않았어요');
-    listener(fixes);
-  };
+  const sendLocations = (fixes: LocationFix[]) => listener(fixes);
 
-  return { controller, repo, location, notification, voice, useRunStore, useToastStore, sendLocations };
+  return { controller, repo, location, notification, voice, visibility, useRunStore, useToastStore, sendLocations };
 }
 
 /** 줄 세운 DB 쓰기(약속)가 끝날 때까지 기다린다 */
@@ -136,19 +134,41 @@ describe('시작', () => {
     expect(useRunStore.getState().run).toBeNull();
   });
 
-  it('위치 받기를 켜지 못하면 만든 러닝을 닫고, 다시 시작할 수 있는 상태로 돌아간다', async () => {
+  it('위치 받기를 켜지 못하면 만든 러닝을 흔적 없이 지우고, 다시 시작할 수 있는 상태로 돌아간다', async () => {
     const { controller, repo, location, useRunStore } = await setup();
     location.startLocationUpdates.mockRejectedValueOnce(new Error('permission'));
 
     const result = await controller.startRunSession(FREE, null);
 
     expect(result).toEqual({ ok: false, reason: 'location' });
-    // 0초짜리 기록으로 닫아 복구 창이 뜨지 않게 한다
-    expect(repo.saveFinishedRun).toHaveBeenCalledTimes(1);
+    // 0초짜리 기록이나 복구 창이 남지 않게 지운다
+    expect(repo.deleteRun).toHaveBeenCalledWith('run-uuid');
+    expect(repo.saveFinishedRun).not.toHaveBeenCalled();
     expect(useRunStore.getState().run).toBeNull();
 
     const retry = await controller.startRunSession(FREE, null);
     expect(retry.ok).toBe(true);
+  });
+
+  it('시작하지 못한 러닝을 지우는 것까지 실패해도 다음 시작은 막히지 않는다', async () => {
+    const { controller, repo, location } = await setup();
+    location.startLocationUpdates.mockRejectedValueOnce(new Error('permission'));
+    repo.deleteRun.mockRejectedValueOnce(new Error('disk'));
+
+    expect(await controller.startRunSession(FREE, null)).toEqual({ ok: false, reason: 'location' });
+    expect((await controller.startRunSession(FREE, null)).ok).toBe(true);
+  });
+
+  it('시작을 동시에 두 번 불러도 러닝은 하나만 만들어진다', async () => {
+    const { controller, repo } = await setup();
+
+    const [first, second] = await Promise.all([
+      controller.startRunSession(FREE, null),
+      controller.startRunSession(FREE, null),
+    ]);
+
+    expect([first.ok, second.ok].sort()).toEqual([false, true]);
+    expect(repo.insertRun).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -178,6 +198,27 @@ describe('위치 · 타이머 → 계산 → 저장', () => {
     await vi.advanceTimersByTimeAsync(3000);
 
     expect(useRunStore.getState().now).toBe(T0 + 3000);
+  });
+
+  it('화면이 꺼져 있으면 화면 갱신은 건너뛰지만 계산 · 저장 · 음성은 계속한다', async () => {
+    const { controller, repo, voice, visibility, useRunStore } = await setup();
+    await controller.startRunSession(FREE, null);
+    await flush();
+    repo.saveProgress.mockClear();
+    visibility.isAppVisible.mockReturnValue(false);
+
+    await vi.advanceTimersByTimeAsync(600_000);
+
+    // 화면 상태는 꺼지기 전 그대로다
+    expect(useRunStore.getState().now).toBe(T0);
+    expect(repo.saveProgress).toHaveBeenCalled();
+    expect(voice.say).toHaveBeenCalledWith('오늘 1회 인정!');
+
+    // 화면으로 돌아오면 다음 계산 때 최신 값이 보인다
+    visibility.isAppVisible.mockReturnValue(true);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(useRunStore.getState().now).toBe(T0 + 601_000);
+    expect(useRunStore.getState().run?.counted).toBe(true);
   });
 
   it('10분을 채우면 음성과 토스트로 알린다', async () => {
@@ -297,6 +338,54 @@ describe('종료', () => {
     expect(useRunStore.getState().run).toBeNull();
   });
 
+  it('종료 저장을 기다리는 동안에는 타이머 · 위치가 와도 더 계산하거나 저장하지 않는다', async () => {
+    // 끝난 러닝이 뒤늦은 저장으로 다시 "진행 중"이 되거나 위치 점이 두 번 들어가는 것을 막는다
+    const { controller, repo, useRunStore, sendLocations } = await setup();
+    await controller.startRunSession(FREE, null);
+    await vi.advanceTimersByTimeAsync(5000);
+    repo.saveProgress.mockClear();
+
+    let finishSave: () => void = () => {};
+    repo.saveFinishedRun.mockImplementationOnce(() => new Promise<void>((resolve) => (finishSave = resolve)));
+    const finishing = controller.finishRunSession();
+
+    // 저장이 끝나기 전에 타이머가 울리고 위치가 들어온다
+    await vi.advanceTimersByTimeAsync(3000);
+    sendLocations([fixAt(7, 20)]);
+    await flush();
+    expect(repo.saveProgress).not.toHaveBeenCalled();
+
+    finishSave();
+    const summary = await finishing;
+    expect(summary?.elapsedMs).toBe(5000);
+    expect(useRunStore.getState().run).toBeNull();
+    expect(repo.saveProgress).not.toHaveBeenCalled();
+  });
+
+  it('종료를 두 번 눌러도 저장은 한 번만 하고 같은 결과를 돌려준다', async () => {
+    const { controller, repo } = await setup();
+    await controller.startRunSession(FREE, null);
+    await vi.advanceTimersByTimeAsync(5000);
+
+    const [first, second] = await Promise.all([controller.finishRunSession(), controller.finishRunSession()]);
+
+    expect(first).not.toBeNull();
+    expect(second).toBe(first);
+    expect(repo.saveFinishedRun).toHaveBeenCalledTimes(1);
+  });
+
+  it('종료 저장에 실패하면 타이머를 다시 돌려 러닝을 이어 간다', async () => {
+    const { controller, repo, useRunStore } = await setup();
+    await controller.startRunSession(FREE, null);
+    await vi.advanceTimersByTimeAsync(5000);
+    repo.saveFinishedRun.mockRejectedValueOnce(new Error('disk'));
+
+    expect(await controller.finishRunSession()).toBeNull();
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(useRunStore.getState().now).toBe(T0 + 7000);
+  });
+
   it('위치 끄기가 실패해도 기록은 저장된 것으로 끝낸다', async () => {
     const { controller, location } = await setup();
     await controller.startRunSession(FREE, null);
@@ -348,6 +437,42 @@ describe('강제 종료 복구', () => {
     expect(location.startLocationUpdates).not.toHaveBeenCalled();
   });
 
+  it('화면을 다시 붙일 때 잠금화면 버튼과 음성도 다시 붙인다', async () => {
+    const { controller, repo, location, notification, voice, useRunStore } = await setup();
+    const saved = await savedRun();
+    repo.loadActiveRun.mockResolvedValue({ ...saved, savedAt: T0 - 2000 });
+    location.isLocationRunning.mockResolvedValue(true);
+
+    await controller.checkPendingRun();
+
+    expect(notification.startRunControl).toHaveBeenCalledTimes(1);
+    expect(notification.startRunControl.mock.calls[0][1]).toBe(false);
+    expect(voice.prepareVoice).toHaveBeenCalledWith('duck');
+
+    // 다시 붙은 버튼으로 일시정지가 된다
+    notification.startRunControl.mock.calls[0][0].onPause();
+    await flush();
+    expect(useRunStore.getState().run?.status).toBe('paused');
+  });
+
+  it('러닝이 없는데 위치 받기만 남아 있으면 끈다', async () => {
+    const { controller, location } = await setup();
+
+    expect(await controller.checkPendingRun()).toBeNull();
+
+    expect(location.stopLocationUpdates).toHaveBeenCalledTimes(1);
+  });
+
+  it('끝나지 않은 러닝이 남아 있으면 새 러닝을 시작하지 않는다(복구 상태를 덮어쓰지 않는다)', async () => {
+    const { controller, repo } = await setup();
+    repo.loadActiveRun.mockResolvedValue(await savedRun());
+
+    const result = await controller.startRunSession(FREE, null);
+
+    expect(result).toEqual({ ok: false, reason: 'already-running' });
+    expect(repo.insertRun).not.toHaveBeenCalled();
+  });
+
   it('위치 작업 등록은 남아 있어도 저장이 한참 끊겨 있었으면, 이어 가지 않고 물어보게 한다', async () => {
     // 앱이 강제 종료되면 등록은 남지만 기록은 멈춘다. 꺼져 있던 10분을 뛴 시간으로 치면 안 된다.
     const { controller, repo, location, useRunStore } = await setup();
@@ -393,37 +518,44 @@ describe('강제 종료 복구', () => {
   });
 
   it('화면 없이 프로세스만 다시 살아나 위치가 들어오면, 저장된 상태를 되살려 이어서 계산한다', async () => {
-    const { controller, repo, location, useRunStore } = await setup();
-    // 살아 있던 프로세스가 죽기 전에 등록해 둔 것과 같은 상황을 만들기 위해 한 번 시작했다 끝낸다
-    await controller.startRunSession(FREE, null);
-    const listener = location.setLocationListener.mock.calls[0][0]!;
-    await controller.finishRunSession();
-    repo.saveProgress.mockClear();
-
+    const { repo, notification, voice, useRunStore, sendLocations } = await setup();
     const { startRun } = await import('@/domain/runEngine');
     repo.loadActiveRun.mockResolvedValue({
       state: startRun({ runId: 'old-run', config: FREE, planLabel: null, now: T0 - 60_000 }).state,
       savedAt: T0 - 1000,
     });
 
-    listener([fixAt(0, 0)]);
+    sendLocations([fixAt(0, 0)]);
     await flush();
 
     expect(useRunStore.getState().run?.runId).toBe('old-run');
     expect(repo.saveProgress).toHaveBeenCalled();
+    // 잠금화면 버튼과 음성도 다시 붙는다
+    expect(notification.startRunControl).toHaveBeenCalledTimes(1);
+    expect(voice.prepareVoice).toHaveBeenCalledTimes(1);
+  });
+
+  it('되살리는 사이 위치가 연달아 와도 되살리기는 한 번만 한다', async () => {
+    const { repo, sendLocations } = await setup();
+    const { startRun } = await import('@/domain/runEngine');
+    repo.loadActiveRun.mockResolvedValue({
+      state: startRun({ runId: 'old-run', config: FREE, planLabel: null, now: T0 - 60_000 }).state,
+      savedAt: T0 - 1000,
+    });
+
+    sendLocations([fixAt(0, 0)]);
+    sendLocations([fixAt(1, 3)]);
+    sendLocations([fixAt(2, 6)]);
+    await flush();
+
+    expect(repo.loadActiveRun).toHaveBeenCalledTimes(1);
   });
 
   it('한참 끊겨 있다가 위치만 다시 들어오면, 이어 가지 않고 위치 받기를 끈다(물어볼 러닝은 DB에 남긴다)', async () => {
-    const { controller, repo, location, useRunStore } = await setup();
-    await controller.startRunSession(FREE, null);
-    const listener = location.setLocationListener.mock.calls[0][0]!;
-    await controller.finishRunSession();
-    location.stopLocationUpdates.mockClear();
-    repo.saveProgress.mockClear();
-    repo.saveFinishedRun.mockClear();
+    const { repo, location, useRunStore, sendLocations } = await setup();
     repo.loadActiveRun.mockResolvedValue(await savedRun());
 
-    listener([fixAt(0, 0)]);
+    sendLocations([fixAt(0, 0)]);
     await flush();
 
     expect(useRunStore.getState().run).toBeNull();
@@ -433,13 +565,9 @@ describe('강제 종료 복구', () => {
   });
 
   it('되살릴 러닝이 없는데 위치만 들어오면 위치 받기를 끈다', async () => {
-    const { controller, location } = await setup();
-    await controller.startRunSession(FREE, null);
-    const listener = location.setLocationListener.mock.calls[0][0]!;
-    await controller.finishRunSession();
-    location.stopLocationUpdates.mockClear();
+    const { location, sendLocations } = await setup();
 
-    listener([fixAt(0, 0)]);
+    sendLocations([fixAt(0, 0)]);
     await flush();
 
     expect(location.stopLocationUpdates).toHaveBeenCalledTimes(1);

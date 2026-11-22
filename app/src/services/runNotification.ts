@@ -37,15 +37,18 @@ async function prepare(): Promise<void> {
   prepared = true;
 }
 
-/** 러닝 시작 때 부른다. 알림 버튼을 누르면 handlers가 불린다. */
-export async function startRunControl(handlers: Handlers): Promise<void> {
+/**
+ * 러닝을 시작하거나 다시 이어 붙을 때 부른다. 알림 버튼을 누르면 handlers가 불린다.
+ * 이어 붙는 러닝이 일시정지 중이면 paused로 [재개] 버튼을 띄운다.
+ */
+export async function startRunControl(handlers: Handlers, paused = false): Promise<void> {
   subscription?.remove();
   subscription = Notifications.addNotificationResponseReceivedListener((response) => {
     if (response.notification.request.identifier !== NOTIFICATION_ID) return;
     if (response.actionIdentifier === ACTION_PAUSE) handlers.onPause();
     if (response.actionIdentifier === ACTION_RESUME) handlers.onResume();
   });
-  await showRunControl(false);
+  await showRunControl(paused);
 }
 
 /** 상태가 바뀔 때마다 부른다. 같은 번호로 다시 띄워 버튼만 바꾼다. */

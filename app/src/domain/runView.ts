@@ -65,20 +65,22 @@ type Primary = Pick<RunView, 'primaryLabel' | 'primaryValue' | 'secondaryText'>;
 function primaryFor(state: RunState, now: number, elapsed: number): Primary {
   switch (state.config.mode) {
     case 'free':
-      return freePrimary(state, now, elapsed);
+      return freePrimary(state, now, elapsed, state.config.targetDurationSec);
     // 인터벌 · 케이던스 · 페이스메이커의 전용 표시는 F-003에서 채운다. 그 전까지는 경과 시간을 보여 준다.
     case 'interval':
     case 'cadence':
     case 'pacemaker':
-      return { primaryLabel: '경과 시간', primaryValue: formatDuration(elapsed), secondaryText: countedText(state, now) };
+      return elapsedPrimary('경과 시간', state, now, elapsed);
   }
 }
 
-function freePrimary(state: RunState, now: number, elapsed: number): Primary {
-  const target = state.config.mode === 'free' ? state.config.targetDurationSec : null;
-  if (target == null) {
-    return { primaryLabel: '경과 시간', primaryValue: formatDuration(elapsed), secondaryText: countedText(state, now) };
-  }
+/** 경과 시간을 크게 보여 주고, 아래 줄에 1회 인정까지 남은 시간을 둔다. */
+function elapsedPrimary(label: string, state: RunState, now: number, elapsed: number): Primary {
+  return { primaryLabel: label, primaryValue: formatDuration(elapsed), secondaryText: countedText(state, now) };
+}
+
+function freePrimary(state: RunState, now: number, elapsed: number, target: number | null): Primary {
+  if (target == null) return elapsedPrimary('경과 시간', state, now, elapsed);
   const remainingMs = target * 1000 - elapsed;
   if (remainingMs > 0) {
     return {
@@ -88,11 +90,7 @@ function freePrimary(state: RunState, now: number, elapsed: number): Primary {
     };
   }
   // 목표 시간을 넘겨도 끝내지 않는다. 직접 끝낼 때까지 기록한다.
-  return {
-    primaryLabel: '목표를 채웠어요 · 경과 시간',
-    primaryValue: formatDuration(elapsed),
-    secondaryText: countedText(state, now),
-  };
+  return elapsedPrimary('목표를 채웠어요 · 경과 시간', state, now, elapsed);
 }
 
 function countedText(state: RunState, now: number): string {

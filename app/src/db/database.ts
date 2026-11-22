@@ -22,6 +22,30 @@ export function getDb(): Promise<SQLite.SQLiteDatabase> {
   return dbPromise;
 }
 
+let writeLock: Promise<unknown> = Promise.resolve();
+
+/**
+ * 쓰기 여러 개를 "전부 되거나 전부 안 되게" 묶는다. 한 번에 하나씩만 돈다.
+ *
+ * expo-sqlite의 withExclusiveTransactionAsync는 부를 때마다 DB 연결을 새로 열고 닫아서
+ * 러닝 중 1초마다 쓰기에는 무겁고, 새 연결에는 foreign_keys 설정도 걸리지 않는다.
+ * 그래서 늘 쓰는 연결에서 트랜잭션을 열되, 다른 쓰기가 그 사이에 끼어들지 않게 여기서 줄을 세운다.
+ * (앱의 모든 쓰기는 이 함수를 거친다.)
+ */
+export function withWriteTransaction<T>(task: (db: SQLite.SQLiteDatabase) => Promise<T>): Promise<T> {
+  const run = writeLock.then(async () => {
+    const db = await getDb();
+    let result!: T;
+    await db.withTransactionAsync(async () => {
+      result = await task(db);
+    });
+    return result;
+  });
+  // 앞 작업이 실패해도 다음 작업은 돌아야 한다
+  writeLock = run.catch(() => undefined);
+  return run;
+}
+
 async function open(): Promise<SQLite.SQLiteDatabase> {
   const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');

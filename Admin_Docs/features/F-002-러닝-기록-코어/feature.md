@@ -44,16 +44,20 @@
 - 바뀐 파일 (모두 `app/src/` 아래)
   - 계산(순수 함수): `domain/runEngine.ts`(경과 시간 · 거리 · GPS 끊김 · 10분 인정 · km 구간 · 종료 요약 · 복구), `modeCues.ts`(자유 모드 거리 안내), `pace.ts`, `geo.ts`, `format.ts`, `runView.ts`(화면에 그릴 글자), `runConfig.ts`(목표값 기본값 · 설명)
   - 저장: `db/schema.ts`(2단계: active_run), `db/runsRepo.ts`
-  - 기기 기능: `services/runController.ts`(진행 관리), `runLocation.ts`(백그라운드 위치), `voice.ts`(음성 + 음악 볼륨 낮추기), `runNotification.ts`(잠금화면 버튼), `permissions.ts`, `gps.ts`, `runHistory.ts`
-  - 상태: `state/runStore.ts` / 테마: `theme/useRunScheme.ts`
+  - 기기 기능: `services/runController.ts`(진행 관리), `runLocation.ts`(백그라운드 위치), `voice.ts`(음성 + 음악 볼륨 낮추기), `runNotification.ts`(잠금화면 버튼), `permissions.ts`, `gps.ts`, `runHistory.ts`, `haptics.ts`(진동), `appVisibility.ts`
+  - 상태: `state/runStore.ts`, `state/useRunScheme.ts`(러닝 화면 테마)
   - 화면: `app/run/_layout.tsx`, `countdown.tsx`, `active.tsx`, `summary/[id].tsx`, `app/(tabs)/home.tsx`(임시 홈)
-  - 화면 부품: `components/run/`(RunSetupSheet · ModeCard · ConfigAdjuster · BatteryBanner · GpsNotice · LocationAlert · RunDashboard · RunNow · Stat · HoldToFinishButton · RunBottomActions · RunSummaryView · PocketMode · TextLink, 훅 useStartRun · useHoldProgress · useAndroidBack, configFields), `components/ModeBadge.tsx`
+  - 화면 부품: `components/run/`(RunSetupSheet · ModeCard · ConfigAdjuster · BatteryBanner · GpsNotice · LocationAlert · RunDashboard · RunNow · Stat · HoldToFinishButton · RunBottomActions · RunSummaryView · PocketMode · TextLink, 훅 useStartRun · usePendingRunRecovery · useHoldProgress · useAndroidBack, configFields), `components/ModeBadge.tsx`
   - 소리 파일: `app/assets/audio/`(무음 1개 + 메트로놈 9개), 만드는 스크립트 `app/scripts/make_audio.py`
   - 테스트: `domain/runEngine.test.ts`, `runView.test.ts`, `runConfig.test.ts`, `services/runController.test.ts`, `components/run/configFields.test.ts`, `db/schema.test.ts`(보강)
 - 실제 구조
   - 계산은 전부 `runEngine`의 순수 함수가 한다. `runController`는 "위치가 왔을 때 · 1초 타이머가 울렸을 때 계산 함수를 부르고, 결과를 화면 상태 · DB · 음성으로 보내는" 일만 한다(D-005).
   - 진행 값 · 새 위치 점 · 복구용 상태(active_run)를 약 1초마다 한 트랜잭션으로 저장한다. 저장에 실패한 점은 버리지 않고 다음 저장 때 다시 넣는다.
   - 앱을 켰을 때 끝나지 않은 러닝이 있으면 "마지막 저장이 30초 안인가"로 판단한다. 30초 안이고 위치 받기가 돌고 있으면 화면만 다시 붙이고, 아니면 "이어서 / 여기까지 저장"을 묻는다. 꺼져 있던 시간은 일시정지로 친다.
+  - 끝내는 동안에는 타이머를 멈추고 위치도 받지 않는다. 종료를 두 번 눌러도 저장은 한 번이다. 저장에 실패하면 타이머를 다시 돌려 러닝을 이어 간다(1차 리뷰 R3 지적 반영).
+  - 진행 관리자는 파일이 읽히는 순간 위치 받을 곳을 등록한다. 앱이 죽었다 위치 작업으로 되살아나도 위치를 받고, 그때 잠금화면 버튼 · 음성도 다시 붙인다.
+  - 폰 DB 쓰기는 모두 `withWriteTransaction`(늘 쓰는 연결 + 한 줄 세우기)을 거친다. 매초 연결을 새로 열지 않는다(R2 지적 반영).
+  - 화면이 꺼져 있거나 앱이 뒤에 있으면 화면 상태 갱신을 건너뛴다(계산 · 저장 · 음성은 계속).
   - 화면은 `describeRun()`이 준 글자를 그리기만 한다. 경과 시간은 저장하지 않고 `지금 시각`으로 매번 계산한다.
   - 러닝 화면 묶음(`run/_layout`)만 OS 다크 설정을 따라 Dark가 된다.
 - 설계 의도와 다른 점
@@ -64,19 +68,23 @@
   - 시작 전 설정에서 목표값을 고치는 화면이 피그마에 없어, 목표값 줄을 누르면 [−] 값 [+] 칸이 펼쳐지게 만들었다. 카운트다운 화면도 피그마에 없어 러닝 화면의 큰 숫자 스타일로 만들었다.
   - 10분 전 종료 확인 창은 러닝 화면이 Dark여도 Light로 그린다(피그마에 Light만 있다).
   - 주머니 모드(RUN_01_005)는 화면 부품만 있고 켜는 곳이 없다 → Q-003.
+  - GPS 약함 안내(RUN_02_001)는 3초 토스트가 아니라 신호를 잡을 때까지 떠 있다. 시작 전 설정 시트가 열려 있으면 앱 토스트가 시트 뒤에 가려지기 때문이다. 약 2분 동안 못 잡으면 찾기를 멈추고 [그냥 시작하기]만 남긴다.
+  - 목표값의 범위 · 한 칸 크기 · 기본값, 자유 러닝의 '제한 없음'은 기획에 없어 임시로 정했다 → Q-004.
+  - 알림 권한은 온보딩(F-004)이 생기기 전까지 시작 전 확인에서 요청한다(잠금화면 버튼에 필요).
 - 에뮬레이터(Android API 37)에서 확인한 것 (2026-11-22~23)
   - [시작] → 시트 → 위치 권한 → GPS 대기 → 카운트다운 → 러닝 중. 위치를 1초마다 3m씩 60번 움직여 거리 0.17km · 평균 페이스 표시 확인
   - 일시정지 → 0.6초 누름은 취소, 2초 누름은 "8분만 더 뛰면 1회 인정이에요" 창 → [더 뛰기]는 창만 닫힘, [그냥 종료] → 완료 요약 → [확인] → 홈
   - DB: runs 1줄(finished · 154초 · 179.6m · counted 0), run_points 65줄, run_segments 1줄, active_run 0줄. 스키마 1단계 DB가 2단계로 올라감
   - [10분만 뛰기] + OS 다크: 러닝 화면만 Dark(테두리 버튼). 앱을 뒤로 보낸 30초 동안 거리 · 위치 점이 계속 저장됨
   - 러닝 중 강제 종료 → 40초 뒤 다시 열면 복구 창 → [여기까지 저장] → 완료 요약, active_run 비워짐
+  - 1차 리뷰 반영 뒤 다시 확인(2026-11-23): 알림 권한 창 → 허용 → 러닝 → 알림 2개(위치 기록 + [일시정지] 버튼) 표시 → 일시정지 → 길게 눌러 종료 → 요약. DB: finished · 46초 · 93.1m, 위치 점 26개(겹치는 점 없음), active_run 0줄, 알림 0개
   - 확인 중 찾아 고친 것: 강제 종료 뒤 다시 켜면 복구 창 없이 이어지면서 꺼져 있던 시간이 경과 시간에 들어갔다(위치 작업 등록이 남아 "기록 중"으로 오판) → 마지막 저장 시각으로 판단하게 고침
 
 ## 리뷰
 - review/SUMMARY.md (아직 없음)
 
 ## 열린 질문
-- Q-003
+- Q-003, Q-004
 
 ## 면접 예상 질문
 (1차 리뷰 뒤 작성)
