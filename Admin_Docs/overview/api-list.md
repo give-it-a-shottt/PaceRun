@@ -10,7 +10,9 @@
 공통
 - 주소 앞부분: `/api/v1`
 - 인증: `Authorization: Bearer <액세스 토큰>`. "인증" 칸이 O인 요청에 필요하다.
-- 에러 형식: `{"detail": {"code": "대문자_코드", "message": "사용자에게 보여 줄 말"}}`. 입력 오류(422)는 `fields: [{field, message}]`가 더 붙는다.
+- 에러 형식: `{"detail": {"code": "대문자_코드", "message": "사용자에게 보여 줄 말"}}`. 입력 오류(422)는 `fields: [{field, message}]`가 더 붙을 수 있다. 화면은 `fields`가 없거나 `field`가 빈 경우에도 `message`를 보여 줄 수 있어야 한다.
+  - `fields`가 없는 422: 러닝 목록의 `cursor`, 통계의 `tz`와 `anchor` 범위(서버가 값을 풀어 본 뒤에 아는 오류).
+  - `field`가 빈 422: 여러 칸을 함께 보는 검사(러닝의 config 모양, 끝 시각 ≥ 시작 시각, 경과 시간 길이). 어느 칸인지는 `fields[].message` 안에 있다.
 - 공통 에러: 401 `UNAUTHORIZED`(토큰 없음 · 만료 · 틀림), 403 `FORBIDDEN`, 404 `NOT_FOUND`, 405 `METHOD_NOT_ALLOWED`, 411 `LENGTH_REQUIRED`, 413 `PAYLOAD_TOO_LARGE`(본문 2MB 초과), 422 `VALIDATION`, 500 `INTERNAL`. 그 밖의 HTTP 오류는 `HTTP_ERROR`.
 - `/api/v1` 밖: `GET /health` → 200 `{"status": "ok"}` (서버가 떠 있는지 확인용, 인증 없음)
 
@@ -52,17 +54,17 @@
 |---|---|---|---|
 | mode | "free" · "interval" · "cadence" · "pacemaker" | O | |
 | config | 객체 (아래 표) | O | 모드에 맞는 모양 |
-| plan_label | 문자열 또는 null | X(없으면 null) | 50자까지 |
+| plan_label | 문자열 또는 null | X(없으면 null) | 50자까지. NUL 문자(`\u0000`)가 있으면 422 |
 | started_at · ended_at | 시간대가 붙은 ISO 8601 | O | ended_at ≥ started_at |
 | elapsed_s | 정수 | O | 0~86400(24시간), `ended_at − started_at + 5초`를 넘으면 422 |
 | distance_m | 실수 | O | 0~300000 |
 | avg_pace_s_per_km | 실수 또는 null | X(없으면 null) | 0 초과 ~ 86400 |
-| segments | `{idx, kind, started_elapsed_s, duration_s, distance_m}` 배열 | X(없으면 빈 배열) | 1000개까지. kind ∈ run · walk · km, idx ≥ 0, 시간 0~86400, 거리 0~300000 |
+| segments | `{idx, kind, started_elapsed_s, duration_s, distance_m}` 배열 | X(없으면 빈 배열) | 1000개까지. kind ∈ run · walk · km, idx 0~999, 시간 0~86400, 거리 0~300000 |
 | route | `[lat, lng, elapsed_s]` 배열 | X(없으면 빈 배열) | 20000점까지. lat −90~90, lng −180~180, elapsed_s 0~86400 |
 
 - `counted`는 받지 않는다(보내면 422). 서버가 `elapsed_s ≥ 600`(10분)으로 정한다.
 - NaN · 무한대는 받지 않는다.
-- 요청 본문은 2MB까지다. 넘으면 본문을 읽기 전에 413을 준다(로그인 여부와 관계없이). 크기를 밝히지 않은 조각 전송은 411 `LENGTH_REQUIRED`.
+- 요청 본문은 2MB까지다. 넘으면 본문을 읽기 전에 413을 준다(로그인 여부와 관계없이). 조각 전송(`Transfer-Encoding` 머리글이 있는 요청)은 `Content-Length`를 함께 보내도 411 `LENGTH_REQUIRED`. 밝힌 길이보다 실제 본문이 길어 2MB를 넘어도 413이다.
 
 config (폰 DB의 camelCase 칸을 snake_case로 바꾼 것. 틀리면 422이고 문구에 `config.칸이름`이 들어간다)
 

@@ -282,6 +282,33 @@ class TestConsistency:
         assert response.status_code == 422
         assert "config.walk_sec" in response.text and "config.repeats" in response.text
 
+    def test_라벨에_NUL_문자가_있으면_500이_아니라_422다(self, client: TestClient, headers: dict):
+        """Postgres의 글자 칸은 NUL(\\u0000)을 저장하지 못한다. 저장 단계까지 가면 500이 된다."""
+        response = client.put(f"{RUNS}/{uuid.uuid4()}", json=run_body(plan_label="아침\u0000러닝"), headers=headers)
+
+        assert response.status_code == 422
+        assert "plan_label" in response.text
+
+    def test_구간_순번이_구간_수_상한을_넘으면_422(self, client: TestClient, headers: dict):
+        segment = {"idx": 1000, "kind": "km", "started_elapsed_s": 0, "duration_s": 300, "distance_m": 1000.0}
+        response = client.put(f"{RUNS}/{uuid.uuid4()}", json=run_body(segments=[segment]), headers=headers)
+        assert response.status_code == 422
+
+    def test_외래키가_아닌_제약_위반은_로그인_풀림으로_바꾸지_않는다(self, db: Session, signed_up: dict):
+        """검사를 통과했는데 DB 제약에 걸렸다면 서버 쪽 문제다. 401로 숨기지 않고 그대로 올려 500으로 남긴다."""
+        from sqlalchemy.exc import IntegrityError
+
+        from app.models import User
+        from app.schemas.run import RunIn
+        from app.services import run_service
+
+        user = db.scalar(select(User))
+        data = RunIn.model_validate(run_body())
+        data.distance_m = -1.0  # 스키마 검사를 건너뛰고 DB의 CHECK(distance_m >= 0)에 걸리게 한다
+
+        with pytest.raises(IntegrityError):
+            run_service.upsert_run(db, user, uuid.uuid4(), data)
+
     def test_로그인_확인_직후_회원이_지워졌으면_401(self, db: Session):
         """user_id 외래키 위반을 500으로 내보내지 않는다."""
         from app.errors import AppError

@@ -13,11 +13,15 @@ from sqlalchemy.orm import Session, defer
 
 from app.errors import AppError, unauthorized
 from app.models import Run, User
-from app.models.run import COUNTED_MIN_ELAPSED_S
 from app.schemas.run import RunIn
 
+# 이 시간(초) 이상 뛰어야 주간 횟수 1회로 인정한다. 앱의 COUNTED_MIN_ELAPSED_MS(10분)와 같은 규칙이다.
+# 앱과 서버는 코드를 나누지 않아(D-003) 규칙이 두 곳에 있다. 바꿀 때는 둘 다 바꾼다.
+COUNTED_MIN_ELAPSED_S = 10 * 60
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 100
+# Postgres가 외래키 위반에 붙이는 오류 번호(SQLSTATE)
+FOREIGN_KEY_VIOLATION = "23503"
 
 
 def upsert_run(db: Session, user: User, run_id: uuid.UUID, data: RunIn) -> tuple[Run, bool]:
@@ -58,8 +62,11 @@ def upsert_run(db: Session, user: User, run_id: uuid.UUID, data: RunIn) -> tuple
     try:
         row = db.execute(statement).first()
     except IntegrityError as error:
-        # 로그인 확인 직후 회원이 지워진 경우(user_id 외래키 위반). 로그인이 풀린 것과 같다.
         db.rollback()
+        if getattr(error.orig, "sqlstate", None) != FOREIGN_KEY_VIOLATION:
+            # 입력 검사를 통과했는데 다른 제약에 걸렸다면 서버 쪽 문제다. 숨기지 않고 500으로 남긴다.
+            raise
+        # 로그인 확인 직후 회원이 지워진 경우(user_id 외래키 위반). 로그인이 풀린 것과 같다.
         raise unauthorized() from error
     if row is None:
         db.rollback()

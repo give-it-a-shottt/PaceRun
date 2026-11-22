@@ -8,10 +8,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
 
-# 이 시간(초) 이상 뛰어야 주간 횟수 1회로 인정한다. 앱의 COUNTED_MIN_ELAPSED_MS(10분)와 같은 규칙이다.
-# 앱과 서버는 코드를 나누지 않아(D-003) 규칙이 두 곳에 있다. 바꿀 때는 둘 다 바꾼다.
-COUNTED_MIN_ELAPSED_S = 10 * 60
-
 
 class Run(Base):
     """러닝 1건. id는 폰이 만든 UUID를 그대로 쓴다(D-007) — 같은 기록을 여러 번 올려도 한 줄이다."""

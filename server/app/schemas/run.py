@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 RunMode = Literal["free", "interval", "cadence", "pacemaker"]
 SegmentKind = Literal["run", "walk", "km"]
@@ -62,7 +62,7 @@ CONFIG_MODELS: dict[str, type[BaseModel]] = {
 
 
 class Segment(_Strict):
-    idx: int = Field(ge=0)
+    idx: int = Field(ge=0, lt=MAX_SEGMENTS)
     kind: SegmentKind
     started_elapsed_s: int = Field(ge=0, le=MAX_ELAPSED_S)
     duration_s: int = Field(ge=0, le=MAX_ELAPSED_S)
@@ -90,6 +90,14 @@ class RunIn(_Strict):
     avg_pace_s_per_km: float | None = Field(default=None, gt=0, le=MAX_PACE_S_PER_KM)
     segments: list[Segment] = Field(default_factory=list, max_length=MAX_SEGMENTS)
     route: list[RoutePoint] = Field(default_factory=list, max_length=MAX_ROUTE_POINTS)
+
+    @field_validator("plan_label")
+    @classmethod
+    def _no_nul(cls, value: str | None) -> str | None:
+        # Postgres의 글자 칸은 NUL 문자를 저장하지 못한다. 여기서 막지 않으면 저장할 때 500이 난다.
+        if value is not None and "\x00" in value:
+            raise ValueError("쓸 수 없는 문자가 들어 있어요")
+        return value
 
     @model_validator(mode="after")
     def _check(self) -> "RunIn":

@@ -6,9 +6,9 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 from app.deps import CurrentUser, DbSession
-from app.schemas.stats import StatsOut
+from app.schemas.stats import Period, StatsOut
 from app.services import stats_service
-from app.services.stats_service import DEFAULT_TZ, Period
+from app.services.stats_service import DEFAULT_TZ
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 

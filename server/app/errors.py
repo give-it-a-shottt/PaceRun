@@ -54,10 +54,15 @@ _STATUS_MESSAGES = {
 }
 
 
+def error_response(status_code: int, code: str, message: str, headers: dict[str, str] | None = None) -> JSONResponse:
+    """에러 응답 하나를 만든다. 라우터 밖(미들웨어)에서 응답을 직접 만들 때도 이 함수로 모양을 맞춘다."""
+    return JSONResponse(_body(code, message), status_code=status_code, headers=headers)
+
+
 def app_error_response(error: AppError) -> JSONResponse:
     """AppError를 응답으로 바꾼다. 라우터가 응답에 쿠키 삭제 같은 것을 더해야 할 때도 이 함수를 쓴다."""
     headers = {"WWW-Authenticate": "Bearer"} if error.status_code == status.HTTP_401_UNAUTHORIZED else None
-    return JSONResponse(_body(error.code, error.message), status_code=error.status_code, headers=headers)
+    return error_response(error.status_code, error.code, error.message, headers)
 
 
 def register_error_handlers(app: FastAPI) -> None:

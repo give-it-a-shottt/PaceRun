@@ -4,10 +4,9 @@
 한국에서 아침 7시에 뛴 기록이 전날로 잡힌다.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from functools import lru_cache
-from typing import Literal
+from functools import cached_property, lru_cache
 from zoneinfo import ZoneInfo, available_timezones
 
 from fastapi import status
@@ -16,8 +15,8 @@ from sqlalchemy.orm import Session
 
 from app.errors import AppError
 from app.models import Run, User
+from app.schemas.stats import Period
 
-Period = Literal["month", "year"]
 DEFAULT_TZ = "Asia/Seoul"
 # 통계를 볼 수 있는 날짜 범위. 이 밖의 날짜(예: 9999년)는 날짜 계산이 넘쳐 오류가 난다.
 MIN_ANCHOR = date(2000, 1, 1)
@@ -73,11 +72,15 @@ class _Scope:
     db: Session
     user: User
     tz: ZoneInfo
-    # 사용자 시간대 기준의 날짜. 예: 한국 11월 1일 07시(UTC 10월 31일 22시) → 11월 1일
-    local_day: ColumnElement[date] = field(init=False)
 
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "local_day", cast(func.timezone(self.tz.key, Run.started_at), Date))
+    @cached_property
+    def local_day(self) -> ColumnElement[date]:
+        """사용자 시간대 기준의 날짜. 예: 한국 11월 1일 07시(UTC 10월 31일 22시) → 11월 1일
+
+        한 번만 만들어 같은 식을 돌려쓴다. 부를 때마다 새로 만들면 SELECT와 GROUP BY에 들어간 식이
+        서로 다른 매개변수를 갖게 되어, Postgres가 "GROUP BY에 없는 칸"이라며 거절한다.
+        """
+        return cast(func.timezone(self.tz.key, Run.started_at), Date)
 
     def between(self, start: date, end: date) -> list[ColumnElement[bool]]:
         """내 기록 가운데 [start, end) 날짜에 시작한 것. 범위 조건이 인덱스(user_id, started_at)를 탄다."""

@@ -5,6 +5,9 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
+# 통계를 묶는 기간. 요청(쿼리) · 서비스 · 응답이 이 한 곳의 정의를 함께 쓴다.
+Period = Literal["month", "year"]
+
 
 class _FromService(BaseModel):
     # 서비스의 dataclass에서 같은 이름의 칸을 읽어 만든다
@@ -31,7 +34,7 @@ class GoalWeeksOut(_FromService):
 
 
 class StatsOut(_FromService):
-    period: Literal["month", "year"]
+    period: Period
     start: date
     end: date
     buckets: list[BucketOut]

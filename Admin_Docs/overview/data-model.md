@@ -65,7 +65,7 @@ settings 테이블의 키 (`app/src/domain/types.ts`의 `Settings`, 값은 JSON 
 |---|---|---|
 | runs.id | `{id}` (주소) | 그대로 |
 | mode | mode | 그대로 |
-| config_json | config | 칸 이름을 snake_case로(아래 표) |
+| config_json | config | 칸 이름을 snake_case로(아래 표). 폰의 config_json 안에 든 `mode` 칸은 **빼고** 올린다(서버는 바깥의 mode로 모양을 정하고, 모르는 칸이 있으면 422다). 내려받을 때는 바깥의 mode를 다시 넣는다 |
 | plan_label | plan_label | 그대로(null 가능) |
 | started_at (밀리초) | started_at | ISO 8601(UTC, `Z`) |
 | ended_at (밀리초) | ended_at | ISO 8601. 폰에서는 끝나기 전까지 null이지만, 끝난 러닝만 올리므로 항상 있다 |
@@ -87,5 +87,14 @@ config 칸 이름
 | pacemaker | targetPaceSecPerKm · distanceM | target_pace_s_per_km · distance_m |
 
 - 서버가 받는 값의 범위는 api-list.md "러닝"의 표에 있다. 폰에서 고를 수 있는 범위(`app/src/domain/runConfig.ts`)는 모두 그 안이다.
+- 폰의 값이 서버 상한을 넘는 드문 경우(그대로 올리면 영영 422다) — Q-006 임시 처리, 앱이 올릴 때 맞춘다(F-010):
 
-최종 수정: 2026-11-22 · 관련: D-004, D-006, D-007
+| 넘을 수 있는 값 | 언제 | 올릴 때 |
+|---|---|---|
+| 경로 20000점 | 약 5시간 반 넘게 뛴 러닝 | 점을 고르게 솎아 20000점 이하로(처음 · 끝 점은 남긴다) |
+| 평균 페이스 86400초/km | 아주 짧은 거리를 오래 걸은 기록 | null로 올린다 |
+| plan_label 50자 | 지금은 긴 라벨을 만드는 화면이 없다 | 50자로 자른다 |
+| config의 실수 · 범위 밖 값 | 저장돼 있던 옛 값 | 정수로 반올림하고 서버 범위 안으로 맞춘다 |
+| 경과 시간 24시간 · 거리 300km | 끄지 않고 둔 러닝 | 올리지 않는다(폰에만 남기고 "올리지 못한 기록"으로 표시) |
+
+최종 수정: 2026-11-23 · 관련: D-004, D-006, D-007
