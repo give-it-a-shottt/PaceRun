@@ -76,3 +76,29 @@ export function describeEstimate(config: RunConfig): string | null {
   const sec = estimatedDurationSec(config);
   return sec == null ? null : `약 ${Math.max(1, Math.round(sec / 60))}분`;
 }
+
+/** 모드 카드의 순서(피그마 RUN_01_001). 시작 전 설정과 계획의 운동 추가 시트가 함께 쓴다. */
+export const MODE_ORDER: readonly RunMode[] = ['interval', 'cadence', 'pacemaker', 'free'];
+
+/** 모드 카드의 설명 문구 */
+export function modeDescriptions(voiceIntervalKm: number): Record<RunMode, string> {
+  return {
+    interval: '달리기·걷기 구간을 음성으로 안내',
+    cadence: '분당 걸음 수에 맞춰 박자 소리',
+    pacemaker: '목표 페이스에서 벗어나면 알려 줌',
+    free: `${voiceIntervalKm}km마다 거리·페이스만 안내`,
+  };
+}
+
+/**
+ * 시트에서 모드를 바꿨을 때 채울 목표값. 그 모드에서 쓰던 값을 되살린다:
+ * 시트를 열 때 채워 둔 값 → 마지막으로 뛴 설정 → 그 모드의 기본값 순.
+ */
+export function configForMode(
+  mode: RunMode,
+  known: { opened: RunConfig; lastRunConfig: RunConfig | null; defaultCadenceSpm: number },
+): RunConfig {
+  if (known.opened.mode === mode) return known.opened;
+  if (known.lastRunConfig?.mode === mode) return known.lastRunConfig;
+  return defaultConfigFor(mode, known.defaultCadenceSpm);
+}

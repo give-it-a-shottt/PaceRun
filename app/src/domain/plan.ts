@@ -6,7 +6,16 @@ import { nextSession, parsePlanLabel, type FinishedRun } from './home';
 import { describeConfig, estimatedDurationSec } from './runConfig';
 import { MODE_LABEL } from './runView';
 import type { PlanItem, RunConfig, RunMode } from './types';
-import { addDays, DAYS_PER_WEEK, isSameDay, startOfWeek, WEEKDAY_LABELS, WEEKDAY_NAMES, weekdayIndex } from './week';
+import {
+  addDays,
+  DAYS_PER_WEEK,
+  isSameDay,
+  startOfWeek,
+  WEEKDAY_LABELS,
+  WEEKDAY_NAMES,
+  weekdayIndex,
+  weekRangeText,
+} from './week';
 
 /**
  * done = 그날 이 계획으로 뛰었음 / today = 오늘 할 것 / upcoming = 이번 주에 남은 것 /
@@ -123,6 +132,11 @@ export function withoutWorkout(plan: readonly PlanItem[], weekday: number): Plan
   return plan.filter((candidate) => candidate.weekday !== weekday);
 }
 
+/** 계획을 저장 · 비우기 · 적용하지 못했을 때의 안내 */
+export const PLAN_SAVE_ERROR = '계획을 저장하지 못했어요. 다시 시도해 주세요';
+/** 계획을 읽지 못했을 때의 안내(템플릿을 적용하기 전에 지금 계획이 있는지 확인하다 실패한 경우) */
+export const PLAN_LOAD_ERROR = '계획을 불러오지 못했어요. 다시 시도해 주세요';
+
 /** 바텀시트 제목: "금요일에 운동 추가" / "금요일 운동 바꾸기" */
 export function workoutSheetTitle(weekday: number, editing: boolean): string {
   return editing ? `${WEEKDAY_NAMES[weekday]} 운동 바꾸기` : `${WEEKDAY_NAMES[weekday]}에 운동 추가`;
@@ -170,20 +184,12 @@ export function describePlan({ now, plan, runs }: PlanInput): PlanView {
   });
 
   return {
-    rangeText: rangeText(weekStart),
+    rangeText: weekRangeText(now),
     summaryText: summaryText(plan),
     days,
     isEmpty: plan.length === 0,
     nextEmptyWeekday: nextEmptyWeekday(plan, today),
   };
-}
-
-/** "11월 17일 – 23일". 주가 두 달에 걸치면 "11월 30일 – 12월 6일" */
-function rangeText(weekStart: number): string {
-  const first = new Date(weekStart);
-  const last = new Date(addDays(weekStart, DAYS_PER_WEEK - 1));
-  const end = first.getMonth() === last.getMonth() ? `${last.getDate()}일` : `${last.getMonth() + 1}월 ${last.getDate()}일`;
-  return `${first.getMonth() + 1}월 ${first.getDate()}일 – ${end}`;
 }
 
 /** "주 3회 · 약 60분". 시간 제한 없는 자유 러닝이 섞여 있으면 합계를 알 수 없어 횟수만 보여 준다. */

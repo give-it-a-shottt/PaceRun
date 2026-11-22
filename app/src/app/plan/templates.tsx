@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -7,12 +7,11 @@ import { AlertDialog } from '@/components/AlertDialog';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { PlanTemplateCard } from '@/components/plan/PlanTemplateCard';
-import { PLAN_SAVE_ERROR } from '@/components/plan/WorkoutSheet';
 import { useAndroidBack } from '@/components/run/useAndroidBack';
 import { Screen } from '@/components/Screen';
 import { TopBar } from '@/components/TopBar';
-import { PLAN_TEMPLATES } from '@/domain/plan';
-import { applyTemplate, hasPlan, type PlanTemplate } from '@/services/planData';
+import { PLAN_LOAD_ERROR, PLAN_SAVE_ERROR, PLAN_TEMPLATES, type PlanTemplate } from '@/domain/plan';
+import { applyTemplate, hasPlan } from '@/services/planData';
 import { showToast } from '@/state/toastStore';
 import { layout, space } from '@/theme/tokens';
 
@@ -34,18 +33,23 @@ export default function PlanTemplatesScreen() {
   // 제스처 바는 34로 충분하지만, 3버튼 내비게이션 바는 더 높아서 버튼이 가려지지 않게 넓힌다
   const paddingBottom = Math.max(layout.bottomSafePadding, insets.bottom + space[2]);
 
+  // 적용하는 동안에는 뒤로 가지 않는다. 그 사이에 떠나면 적용이 끝난 뒤 한 번 더 뒤로 가서,
+  // 계획 탭까지 지나쳐 버린다.
+  const goBack = useCallback(() => {
+    if (!applyingRef.current) leave();
+  }, []);
   // 폰의 뒤로 가기도 상단 뒤로 가기와 같게 한다(돌아갈 화면이 없을 때 앱이 닫히지 않게)
-  useAndroidBack(leave);
+  useAndroidBack(goBack);
 
   const setBusy = (busy: boolean) => {
     applyingRef.current = busy;
     setApplying(busy);
   };
 
-  const fail = (error: unknown) => {
+  const fail = (error: unknown, message: string) => {
     console.warn('[plan] 템플릿을 적용하지 못했어요', error);
     setBusy(false);
-    showToast(PLAN_SAVE_ERROR);
+    showToast(message);
   };
 
   const apply = async (template: PlanTemplate) => {
@@ -53,7 +57,7 @@ export default function PlanTemplatesScreen() {
     try {
       await applyTemplate(template);
     } catch (error) {
-      fail(error);
+      fail(error, PLAN_SAVE_ERROR);
       return;
     }
     // 화면이 넘어가는 사이에 다시 눌리지 않게 로딩인 채로 떠난다
@@ -68,7 +72,7 @@ export default function PlanTemplatesScreen() {
     try {
       exists = await hasPlan();
     } catch (error) {
-      fail(error);
+      fail(error, PLAN_LOAD_ERROR);
       return;
     }
     if (exists) {
@@ -87,7 +91,7 @@ export default function PlanTemplatesScreen() {
 
   return (
     <Screen>
-      <TopBar variant="back" title="템플릿 선택" onBack={leave} />
+      <TopBar variant="back" title="템플릿 선택" onBack={goBack} />
       <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
         <AppText variant="body14R" color="textSub">
           고르면 이번 주부터 매주 같은 요일에 채워져요. 나중에 요일마다 바꿀 수 있어요.

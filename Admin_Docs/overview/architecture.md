@@ -22,7 +22,7 @@
 - `app/src/db/` — expo-sqlite 스키마와 쿼리. 쓰기는 모두 `withWriteTransaction`으로 한 줄씩 한다.
 - `app/src/state/` — 화면 여러 곳이 함께 보는 메모리 상태(zustand): 설정(settingsStore), 토스트(toastStore), 진행 중인 러닝(runStore), 러닝 화면 테마(useRunScheme). DB를 불러 값을 채운다.
 - `app/plugins/` — 네이티브 빌드 설정을 덧붙이는 설정 플러그인(`android/`는 만들어지는 산출물이라 직접 고치지 않는다).
-- `app/src/theme/` · `app/src/components/` — 디자인 토큰과 공용 컴포넌트. 한 기능에서만 쓰는 화면 부품은 `components/run/`처럼 기능 폴더에 둔다.
+- `app/src/theme/` · `app/src/components/` — 디자인 토큰과 공용 컴포넌트(여러 화면이 함께 쓰는 훅도 여기: 예 `useRefreshOnFocus`). 한 기능에서만 쓰는 화면 부품은 `components/run/`처럼 기능 폴더에 둔다.
 - `server/app/routers/` → `server/app/services/` → `server/app/models/` — 의존은 이 방향으로만 흐른다. 라우터에는 요청 · 응답 변환만 둔다.
 - `web/src/pages/` · `web/src/api/` · `web/src/components/`.
 

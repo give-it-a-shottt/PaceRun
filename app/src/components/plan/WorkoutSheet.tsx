@@ -6,10 +6,9 @@ import { BottomSheet } from '@/components/BottomSheet';
 import { Button } from '@/components/Button';
 import { ConfigAdjuster } from '@/components/run/ConfigAdjuster';
 import { ModeCard } from '@/components/run/ModeCard';
-import { MODE_ORDER, modeDescriptions } from '@/components/run/RunSetupSheet';
 import { TextLink } from '@/components/run/TextLink';
-import { workoutSheetTitle } from '@/domain/plan';
-import { defaultConfigFor } from '@/domain/runConfig';
+import { PLAN_SAVE_ERROR, workoutSheetTitle } from '@/domain/plan';
+import { configForMode, defaultConfigFor, MODE_ORDER, modeDescriptions } from '@/domain/runConfig';
 import type { RunConfig, RunMode } from '@/domain/types';
 import { removeWorkout, saveWorkout } from '@/services/planData';
 import { useSettingsStore } from '@/state/settingsStore';
@@ -25,8 +24,6 @@ type Props = {
   /** 저장하거나 비운 뒤(시트는 이미 닫혔다). 계획을 다시 읽을 때 쓴다. */
   onSaved: () => void;
 };
-
-export const PLAN_SAVE_ERROR = '계획을 저장하지 못했어요. 다시 시도해 주세요';
 
 /** 앱 토스트와 같은 3초 */
 const NOTICE_DURATION_MS = 3000;
@@ -64,10 +61,7 @@ function OpenSheet({ weekday, initialConfig, onClose, onSaved }: Omit<Props, 'we
 
   const selectMode = (mode: RunMode) => {
     if (mode === config.mode) return;
-    // 시작 전 설정 시트와 같게: 열 때 채운 값 → 마지막 설정 → 기본값 순으로, 그 모드에서 쓰던 값을 되살린다
-    if (opened.mode === mode) setConfig(opened);
-    else if (lastRunConfig?.mode === mode) setConfig(lastRunConfig);
-    else setConfig(defaultConfigFor(mode, defaultCadenceSpm));
+    setConfig(configForMode(mode, { opened, lastRunConfig, defaultCadenceSpm }));
   };
 
   const run = async (kind: 'save' | 'remove') => {

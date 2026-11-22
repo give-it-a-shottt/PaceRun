@@ -4,7 +4,7 @@ import { AppState, StyleSheet, View } from 'react-native';
 import { BottomSheet } from '@/components/BottomSheet';
 import { Button } from '@/components/Button';
 import { PlayIcon } from '@/components/icons';
-import { defaultConfigFor } from '@/domain/runConfig';
+import { configForMode, defaultConfigFor, MODE_ORDER, modeDescriptions } from '@/domain/runConfig';
 import type { RunConfig, RunMode } from '@/domain/types';
 import { isBatteryOptimized, openBatterySettings } from '@/services/permissions';
 import { useSettingsStore } from '@/state/settingsStore';
@@ -26,19 +26,6 @@ type Props = {
   /** initialConfig에 붙는 계획 이름. 설정을 바꾸지 않고 시작했을 때만 러닝에 붙는다. */
   planLabel?: string | null;
 };
-
-/** 카드 순서는 피그마(RUN_01_001)를 따른다. 계획의 운동 추가 시트(PLN_01_002)도 같은 순서 · 설명을 쓴다. */
-export const MODE_ORDER: readonly RunMode[] = ['interval', 'cadence', 'pacemaker', 'free'];
-
-/** 모드 카드의 설명 문구 */
-export function modeDescriptions(voiceIntervalKm: number): Record<RunMode, string> {
-  return {
-    interval: '달리기·걷기 구간을 음성으로 안내',
-    cadence: '분당 걸음 수에 맞춰 박자 소리',
-    pacemaker: '목표 페이스에서 벗어나면 알려 줌',
-    free: `${voiceIntervalKm}km마다 거리·페이스만 안내`,
-  };
-}
 
 /** RUN_01_001 시작 전 설정 시트: 모드 4개 + 목표값 + (배터리 경고) + [시작] */
 export function RunSetupSheet({ visible, ...rest }: Props) {
@@ -68,10 +55,7 @@ function OpenSheet({ onClose, initialConfig, planLabel = null }: Omit<Props, 'vi
 
   const selectMode = (mode: RunMode) => {
     if (mode === config.mode) return;
-    // 열 때 채운 값 → 마지막 설정 → 기본값 순으로, 그 모드에서 쓰던 값을 되살린다
-    if (opened.mode === mode) change(opened);
-    else if (lastRunConfig?.mode === mode) change(lastRunConfig);
-    else change(defaultConfigFor(mode, defaultCadenceSpm));
+    change(configForMode(mode, { opened, lastRunConfig, defaultCadenceSpm }));
   };
 
   const handleStart = () => {

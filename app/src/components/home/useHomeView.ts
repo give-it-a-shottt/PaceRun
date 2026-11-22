@@ -1,13 +1,8 @@
-import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { AppState } from 'react-native';
 
-import { msUntilNextDay } from '@/domain/week';
+import { useRefreshOnFocus } from '@/components/useRefreshOnFocus';
 import { loadHome, type HomeView } from '@/services/homeData';
 import { useSettingsStore } from '@/state/settingsStore';
-
-/** 자정 정각에 읽으면 시계 오차로 아직 어제일 수 있어 조금 지나서 읽는다 */
-const MIDNIGHT_MARGIN_MS = 2_000;
 
 /**
  * loading = 아직 그릴 값이 없음(처음 읽는 중이거나 실패 뒤 다시 읽는 중) / ready = 값이 있음 / failed = 읽지 못함.
@@ -44,28 +39,8 @@ export function useHomeView() {
     );
   }, [weeklyGoal]);
 
-  useFocusEffect(
-    useCallback(() => {
-      reload();
-      // 앱을 켜 둔 채 날짜가 바뀌면 '오늘'이 달라지므로 앱으로 돌아올 때도 다시 읽는다
-      const subscription = AppState.addEventListener('change', (appState) => {
-        if (appState === 'active') reload();
-      });
-      // 화면을 켜 둔 채 자정을 넘기는 경우: 다음 날 0시가 조금 지난 뒤 다시 읽고, 그다음 자정을 다시 기다린다
-      let midnight: ReturnType<typeof setTimeout>;
-      const waitForMidnight = () => {
-        midnight = setTimeout(() => {
-          reload();
-          waitForMidnight();
-        }, msUntilNextDay(Date.now()) + MIDNIGHT_MARGIN_MS);
-      };
-      waitForMidnight();
-      return () => {
-        subscription.remove();
-        clearTimeout(midnight);
-      };
-    }, [reload]),
-  );
+  // 화면이 보일 때 · 앱으로 돌아올 때 · 자정이 지날 때 다시 읽는다
+  useRefreshOnFocus(reload);
 
   return { state, reload };
 }

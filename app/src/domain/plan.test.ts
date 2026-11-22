@@ -199,3 +199,53 @@ describe('계획 탭에 그릴 값', () => {
     expect(view(full).nextEmptyWeekday).toBeNull();
   });
 });
+
+describe('요일과 이름의 경계', () => {
+  const view = (plan: readonly PlanItem[], runs: FinishedRun[], now: number) => describePlan({ now, plan, runs });
+  const EVERY_DAY: PlanItem[] = [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({ ...INTERVAL_TEMPLATE.items[0], weekday }));
+
+  it('월요일에는 지나간 날이 없다: 오늘부터 일요일까지 회차가 차례로 붙는다', () => {
+    const days = view(EVERY_DAY, [], at(11, 16, 9)).days;
+    expect(days.map((day) => day.workout?.status)).toEqual([
+      'today', 'upcoming', 'upcoming', 'upcoming', 'upcoming', 'upcoming', 'upcoming',
+    ]);
+    expect(days.map((day) => day.workout?.title)).toEqual(
+      [1, 2, 3, 4, 5, 6, 7].map((session) => `인터벌 입문 ${session}회차`),
+    );
+  });
+
+  it('일요일에는 앞의 엿새가 지나간 날이다: 뛰지 않았으면 이름만 보인다', () => {
+    const days = view(EVERY_DAY, [], at(11, 22, 9)).days;
+    expect(days.slice(0, 6).every((day) => day.workout?.status === 'past')).toBe(true);
+    expect(days[6].workout).toMatchObject({ status: 'today', title: '인터벌 입문 1회차' });
+    expect(days[6].isToday).toBe(true);
+  });
+
+  it('지난주 일요일 밤의 기록은 이번 주 월요일을 완료로 만들지 않는다', () => {
+    const runs = [run(at(11, 15, 23, ), { planLabel: '인터벌 입문 1회차' })];
+    const days = view(EVERY_DAY, runs, at(11, 16, 9)).days;
+    expect(days[0].workout).toMatchObject({ status: 'today', title: '인터벌 입문 2회차' });
+  });
+
+  it('같은 이름의 운동이 여러 요일에 있고 오늘 이미 뛰었으면, 남은 날은 그다음 회차부터다', () => {
+    const runs = [
+      run(at(11, 16), { planLabel: '인터벌 입문 1회차' }),
+      run(at(11, 19, 6), { planLabel: '인터벌 입문 2회차' }),
+    ];
+    const days = view(INTERVAL_TEMPLATE.items, runs, THURSDAY).days;
+    expect(days[0].workout).toMatchObject({ status: 'done', title: '인터벌 입문 1회차' });
+    expect(days[3].workout).toMatchObject({ status: 'done', title: '인터벌 입문 2회차' });
+    expect(days[5].workout).toMatchObject({ status: 'upcoming', title: '인터벌 입문 3회차' });
+  });
+
+  it('이름이 비슷한 다른 운동의 기록과 회차가 섞이지 않는다', () => {
+    const runs = [
+      run(at(11, 9), { planLabel: '인터벌 5회차' }), // 직접 추가한 "인터벌"
+      run(at(11, 10), { planLabel: '새 인터벌 입문 9회차' }),
+      run(at(11, 11), { planLabel: '인터벌 입문' }), // 회차가 붙지 않은 이름
+      run(at(11, 19, 6), { planLabel: '인터벌 3회차' }), // 오늘 뛰었지만 이 계획의 러닝이 아니다
+    ];
+    const days = view(INTERVAL_TEMPLATE.items, runs, THURSDAY).days;
+    expect(days[3].workout).toMatchObject({ status: 'today', title: '인터벌 입문 1회차' });
+  });
+});

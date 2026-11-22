@@ -1,7 +1,6 @@
-import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { AppState } from 'react-native';
 
+import { useRefreshOnFocus } from '@/components/useRefreshOnFocus';
 import { loadPlan, type PlanView } from '@/services/planData';
 
 /**
@@ -38,16 +37,8 @@ export function usePlanView() {
     );
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      reload();
-      // 앱을 켜 둔 채 날짜가 바뀌면 '오늘'과 이번 주가 달라지므로 앱으로 돌아올 때도 다시 읽는다
-      const subscription = AppState.addEventListener('change', (appState) => {
-        if (appState === 'active') reload();
-      });
-      return () => subscription.remove();
-    }, [reload]),
-  );
+  // 화면이 보일 때 · 앱으로 돌아올 때 · 자정이 지날 때 다시 읽는다('오늘'과 이번 주가 달라진다)
+  useRefreshOnFocus(reload);
 
   return { state, reload };
 }

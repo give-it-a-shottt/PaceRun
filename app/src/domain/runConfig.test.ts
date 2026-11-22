@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  configForMode,
+  MODE_ORDER,
+  modeDescriptions,
   defaultConfigFor,
   describeConfig,
   describeEstimate,
@@ -61,5 +64,26 @@ describe('describeConfig · describeEstimate', () => {
     expect(describeConfig({ mode: 'free', targetDurationSec: null })).toBe('시간 제한 없이');
     expect(describeEstimate({ mode: 'free', targetDurationSec: null })).toBeNull();
     expect(describeConfig(QUICK_RUN_CONFIG)).toBe('10분 동안');
+  });
+});
+
+describe('시트의 모드 카드', () => {
+  it('네 모드가 모두 한 번씩 있고 설명이 있다', () => {
+    expect([...MODE_ORDER].sort()).toEqual([...RUN_MODES].sort());
+    const descriptions = modeDescriptions(2);
+    for (const mode of MODE_ORDER) expect(descriptions[mode].length).toBeGreaterThan(0);
+    expect(descriptions.free).toBe('2km마다 거리·페이스만 안내');
+  });
+
+  it('모드를 바꾸면 그 모드에서 쓰던 값을 되살린다: 열 때 채운 값 → 마지막 설정 → 기본값', () => {
+    const opened = { mode: 'interval', runSec: 120, walkSec: 60, repeats: 5 } as const;
+    const lastRunConfig = { mode: 'cadence', spm: 180, durationSec: 900 } as const;
+    const known = { opened, lastRunConfig, defaultCadenceSpm: 165 };
+
+    expect(configForMode('interval', known)).toBe(opened);
+    expect(configForMode('cadence', known)).toBe(lastRunConfig);
+    expect(configForMode('pacemaker', known)).toEqual(defaultConfigFor('pacemaker', 165));
+    // 마지막 설정이 없으면 기본값(발걸음 박자는 설정의 기본 걸음 수)
+    expect(configForMode('cadence', { ...known, lastRunConfig: null })).toMatchObject({ mode: 'cadence', spm: 165 });
   });
 });

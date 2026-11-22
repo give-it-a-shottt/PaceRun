@@ -2,24 +2,15 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { CheckCircleIcon } from '@/components/icons';
-import { templateDays } from '@/domain/plan';
-import type { RunMode } from '@/domain/types';
-import type { PlanTemplate } from '@/services/planData';
+import { MODE_BADGE } from '@/components/ModeBadge';
+import { templateDays, type PlanTemplate } from '@/domain/plan';
 import { useTheme } from '@/theme/ThemeContext';
-import { radius, space, type ColorName } from '@/theme/tokens';
+import { radius, space } from '@/theme/tokens';
 
 type Props = {
   template: PlanTemplate;
   selected: boolean;
   onPress: () => void;
-};
-
-/** 요일 칸의 모드 색. 모드 배지(ModeBadge)와 같은 토큰을 쓴다. */
-const MODE_COLOR: Record<RunMode, { text: ColorName; soft: ColorName }> = {
-  free: { text: 'badgeBlackText', soft: 'badgeBlackSoft' },
-  interval: { text: 'badgePlumText', soft: 'badgePlumSoft' },
-  cadence: { text: 'badgeBlueText', soft: 'badgeBlueSoft' },
-  pacemaker: { text: 'badgeGreenText', soft: 'badgeGreenSoft' },
 };
 
 const DAY_CELL_HEIGHT = 28;
@@ -72,7 +63,7 @@ export function PlanTemplateCard({ template, selected, onPress }: Props) {
       </View>
       <View style={styles.days}>
         {days.map((day) => {
-          const color = day.mode ? MODE_COLOR[day.mode] : null;
+          const color = day.mode ? MODE_BADGE[day.mode] : null;
           return (
             <View
               key={day.label}

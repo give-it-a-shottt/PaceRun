@@ -53,3 +53,11 @@ export function weekLabel(time: number): string {
 export function msUntilNextDay(now: number): number {
   return addDays(startOfDay(now), 1) - now;
 }
+
+/** 그 주의 날짜 범위 "11월 17일 – 23일". 주가 두 달에 걸치면 "11월 30일 – 12월 6일" */
+export function weekRangeText(time: number): string {
+  const first = new Date(startOfWeek(time));
+  const last = new Date(addDays(first.getTime(), DAYS_PER_WEEK - 1));
+  const end = first.getMonth() === last.getMonth() ? `${last.getDate()}일` : `${last.getMonth() + 1}월 ${last.getDate()}일`;
+  return `${first.getMonth() + 1}월 ${first.getDate()}일 – ${end}`;
+}

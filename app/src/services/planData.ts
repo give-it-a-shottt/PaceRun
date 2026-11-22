@@ -1,4 +1,4 @@
-import { listPlanItems, replacePlan } from '@/db/planRepo';
+import { listPlanItems, updatePlan } from '@/db/planRepo';
 import { listRunDigests } from '@/db/runsRepo';
 import { describePlan, withoutWorkout, withWorkout, type PlanTemplate, type PlanView } from '@/domain/plan';
 import type { RunConfig } from '@/domain/types';
@@ -18,15 +18,15 @@ export async function hasPlan(): Promise<boolean> {
 
 /** 그 요일에 운동을 넣거나 바꾼다. */
 export async function saveWorkout(weekday: number, config: RunConfig): Promise<void> {
-  await replacePlan(withWorkout(await listPlanItems(), weekday, config));
+  await updatePlan((plan) => withWorkout(plan, weekday, config));
 }
 
 /** 그 요일을 비운다. */
 export async function removeWorkout(weekday: number): Promise<void> {
-  await replacePlan(withoutWorkout(await listPlanItems(), weekday));
+  await updatePlan((plan) => withoutWorkout(plan, weekday));
 }
 
 /** 템플릿으로 계획 전체를 바꾼다(있던 계획은 지워진다). */
 export async function applyTemplate(template: PlanTemplate): Promise<void> {
-  await replacePlan(template.items);
+  await updatePlan(() => template.items);
 }

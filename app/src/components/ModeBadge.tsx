@@ -16,8 +16,9 @@ export const MODE_ICON: Record<RunMode, ComponentType<IconProps>> = {
   pacemaker: LightningIcon,
 };
 
-/** 배지는 자리가 좁아 피그마의 짧은 이름을 쓴다(화면 제목 등에 쓰는 이름은 domain/runView의 MODE_LABEL). */
-const BADGE: Record<RunMode, { label: string; text: ColorName; soft: ColorName }> = {
+/** 모드의 짧은 이름과 색. 템플릿 카드의 요일 칸도 같은 색을 쓴다.
+ * 배지는 자리가 좁아 피그마의 짧은 이름을 쓴다(화면 제목 등에 쓰는 이름은 domain/runView의 MODE_LABEL). */
+export const MODE_BADGE: Record<RunMode, { label: string; text: ColorName; soft: ColorName }> = {
   free: { label: '자유', text: 'badgeBlackText', soft: 'badgeBlackSoft' },
   interval: { label: '인터벌', text: 'badgePlumText', soft: 'badgePlumSoft' },
   cadence: { label: '발걸음 박자', text: 'badgeBlueText', soft: 'badgeBlueSoft' },
@@ -29,7 +30,7 @@ const ICON_SIZE = 16;
 /** 운동 모드 배지. 색만으로 구분하지 않도록 아이콘과 이름을 함께 보여 준다. */
 export function ModeBadge({ mode }: { mode: RunMode }) {
   const { colors } = useTheme();
-  const { label, text, soft } = BADGE[mode];
+  const { label, text, soft } = MODE_BADGE[mode];
   const Icon = MODE_ICON[mode];
 
   return (
