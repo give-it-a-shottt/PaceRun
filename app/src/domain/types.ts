@@ -10,6 +10,9 @@ export type RunConfig =
   | { mode: 'cadence'; spm: number; durationSec: number }
   | { mode: 'pacemaker'; targetPaceSecPerKm: number; distanceM: number };
 
+/** 주간 계획의 한 칸: 그 요일(0=월 … 6=일)에 할 운동. `plan_items` 한 줄이고 매주 되풀이된다. */
+export type PlanItem = { weekday: number; mode: RunMode; config: RunConfig; label: string };
+
 export type RunStatus = 'active' | 'paused' | 'finished';
 
 export type SyncState = 'local' | 'synced';

@@ -11,6 +11,7 @@ import { ToastHost } from '@/components/Toast';
 // 화면이 뜨기 전에 백그라운드 위치 작업과 그 위치를 받을 곳이 등록돼 있어야 한다(import만으로 등록된다).
 // 앱이 죽었다가 위치 작업으로 되살아났을 때 러닝을 이어 가려면 필요하다.
 import '@/services/runController';
+import { syncReminder } from '@/services/reminder';
 import { SETTINGS_LOAD_ERROR, useSettingsStore } from '@/state/settingsStore';
 import { ThemeProvider } from '@/theme/ThemeContext';
 import { space } from '@/theme/tokens';
@@ -24,6 +25,7 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const status = useSettingsStore((s) => s.status);
   const load = useSettingsStore((s) => s.load);
+  const reminderTime = useSettingsStore((s) => s.settings.reminderTime);
 
   useEffect(() => {
     load();
@@ -32,6 +34,11 @@ export default function RootLayout() {
   useEffect(() => {
     if (status !== 'loading') SplashScreen.hideAsync();
   }, [status]);
+
+  // 알림 시간이 바뀔 때마다(설정 · 온보딩) OS에 걸어 둔 매일 알림을 다시 맞춘다
+  useEffect(() => {
+    if (status === 'ready') void syncReminder(reminderTime);
+  }, [status, reminderTime]);
 
   if (status === 'loading') return null;
 

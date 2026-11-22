@@ -14,7 +14,7 @@
 | 화면 ID | 라우트 | 파일 | 형태 |
 |---|---|---|---|
 | — | `/` | index.tsx | 첫 실행이면 온보딩으로, 아니면 홈으로 보냄 |
-| ONB_01_001 | `/onboarding/permissions` | onboarding/permissions.tsx | 페이지 |
+| ONB_01_001 | `/onboarding` | onboarding/index.tsx | 페이지. 첫 주소 `/`(index.tsx)가 온보딩을 마쳤는지 보고 여기 또는 `/home`으로 보낸다 |
 | ONB_01_002 | `/onboarding/battery` | onboarding/battery.tsx | 페이지 |
 | ONB_01_003 | `/onboarding/goal` | onboarding/goal.tsx | 페이지 |
 | HOM_01_001 | `/home` | (tabs)/home.tsx | 탭. 상태 4개는 한 파일 안에서 갈림 |
