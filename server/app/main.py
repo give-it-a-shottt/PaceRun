@@ -14,6 +14,9 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title="Pace Run API", version="1.0.0")
 
+    # 순서가 중요하다: 나중에 추가한 미들웨어가 바깥을 감싼다.
+    # 에러 처리를 먼저, CORS를 나중에 추가해야 500 응답에도 CORS 헤더가 붙는다.
+    register_error_handlers(app)
     app.add_middleware(
         CORSMiddleware,
         # 쿠키를 주고받으려면 "*"가 아니라 주소를 정확히 적어야 한다
@@ -22,7 +25,6 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Authorization", "Content-Type", "X-Refresh-Mode"],
     )
-    register_error_handlers(app)
 
     api = APIRouter(prefix=API_PREFIX)
     api.include_router(auth.router)

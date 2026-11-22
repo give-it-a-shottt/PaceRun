@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from fastapi import status
-from sqlalchemy import delete, or_, select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -24,8 +24,6 @@ from app.security import (
 # 방금 교체된 토큰이 이 시간 안에 다시 오면 "새어 나간 토큰"이 아니라 "같은 사용자의 동시 요청"으로 본다.
 # (브라우저 탭 두 개가 같은 쿠키로 동시에 갱신하는 경우. 이때는 401만 주고 다른 토큰은 건드리지 않는다.)
 ROTATION_GRACE = timedelta(seconds=10)
-# 교체돼 못 쓰게 된 토큰 줄은 재사용 감지를 위해 이 기간만 남겨 두고 지운다
-REVOKED_TOKEN_RETENTION = timedelta(days=1)
 
 
 @dataclass(frozen=True)
@@ -33,6 +31,10 @@ class TokenPair:
     access_token: str
     refresh_token: str
     expires_in: int
+
+
+# models/user.py의 UNIQUE 제약 이름
+EMAIL_UNIQUE_CONSTRAINT = "uq_users_email"
 
 
 def normalize_email(email: str) -> str:
@@ -43,8 +45,17 @@ def _email_taken() -> AppError:
     return AppError(status.HTTP_409_CONFLICT, "EMAIL_TAKEN", "이미 가입된 이메일이에요")
 
 
+class RefreshRaceError(AppError):
+    """방금 교체된 토큰이 다시 온 경우. 응답은 INVALID_REFRESH와 같지만, 라우터가 쿠키를 지우면 안 된다
+    (같은 순간 다른 탭이 받은 새 쿠키까지 지워지기 때문)."""
+
+
 def _invalid_refresh() -> AppError:
     return AppError(status.HTTP_401_UNAUTHORIZED, "INVALID_REFRESH", "다시 로그인해 주세요")
+
+
+def _refresh_race() -> RefreshRaceError:
+    return RefreshRaceError(status.HTTP_401_UNAUTHORIZED, "INVALID_REFRESH", "다시 로그인해 주세요")
 
 
 def signup(db: Session, email: str, password: str) -> tuple[User, TokenPair]:
@@ -57,8 +68,11 @@ def signup(db: Session, email: str, password: str) -> tuple[User, TokenPair]:
     try:
         db.flush()
     except IntegrityError as error:
-        # 위에서 확인한 직후 같은 이메일로 다른 요청이 먼저 가입한 경우. DB의 UNIQUE가 마지막으로 막아 준다.
         db.rollback()
+        # 위에서 확인한 직후 같은 이메일로 다른 요청이 먼저 가입한 경우. DB의 UNIQUE가 마지막으로 막아 준다.
+        # 다른 제약 위반까지 "이미 가입된 이메일"로 바꿔 말하지 않도록 어떤 제약인지 확인한다.
+        if _constraint_name(error) != EMAIL_UNIQUE_CONSTRAINT:
+            raise
         raise _email_taken() from error
 
     tokens = _issue_tokens(db, user)
@@ -100,11 +114,12 @@ def refresh(db: Session, refresh_token: str | None) -> TokenPair:
         raise _invalid_refresh()
 
     if stored.revoked_at is not None:
-        if now - stored.revoked_at > ROTATION_GRACE:
-            # 한참 전에 교체된 토큰이 다시 왔다 = 토큰이 새어 나갔을 수 있다.
-            # 그 회원의 토큰을 모두 끊어 다시 로그인하게 한다.
-            _revoke_all(db, stored.user_id, now)
-            db.commit()
+        if now - stored.revoked_at <= ROTATION_GRACE:
+            raise _refresh_race()
+        # 한참 전에 교체된 토큰이 다시 왔다 = 토큰이 새어 나갔을 수 있다.
+        # 그 회원의 토큰을 모두 끊어 다시 로그인하게 한다.
+        _revoke_all(db, stored.user_id, now)
+        db.commit()
         raise _invalid_refresh()
 
     if stored.expires_at <= now:
@@ -121,21 +136,26 @@ def refresh(db: Session, refresh_token: str | None) -> TokenPair:
 
 
 def logout(db: Session, refresh_token: str | None) -> None:
-    """토큰을 지운다. 없는 토큰이어도 조용히 끝낸다(로그아웃은 여러 번 해도 결과가 같다).
+    """쓸 수 있는 토큰이면 지운다. 없는 토큰이어도 조용히 끝낸다(로그아웃은 여러 번 해도 결과가 같다).
 
     못 쓰게 표시만 하지 않고 지우는 이유: 로그아웃한 토큰이 나중에 다시 와도(오래된 탭 등)
     "새어 나간 토큰"으로 오해해 다른 기기까지 로그아웃시키지 않으려고.
+    이미 교체된 토큰은 지우지 않는다 — 그 줄은 새어 나간 토큰을 알아채는 근거라 남겨 둔다.
     """
     if not refresh_token:
         return
-    db.execute(delete(RefreshToken).where(RefreshToken.token_hash == hash_refresh_token(refresh_token)))
+    db.execute(
+        delete(RefreshToken).where(
+            RefreshToken.token_hash == hash_refresh_token(refresh_token), RefreshToken.revoked_at.is_(None)
+        )
+    )
     db.commit()
 
 
-def update_weekly_goal(db: Session, user: User, weekly_goal: int) -> User:
-    user.weekly_goal = weekly_goal
-    db.commit()
-    return user
+def _constraint_name(error: IntegrityError) -> str | None:
+    """어떤 제약을 어겼는지(Postgres 드라이버가 알려 준다). 알 수 없으면 None."""
+    diag = getattr(error.orig, "diag", None)
+    return getattr(diag, "constraint_name", None)
 
 
 def _issue_tokens(db: Session, user: User) -> TokenPair:
@@ -157,13 +177,12 @@ def _issue_tokens(db: Session, user: User) -> TokenPair:
 
 
 def _delete_stale_tokens(db: Session, user_id: uuid.UUID, now: datetime) -> None:
-    """이 회원의 만료된 토큰과 오래전에 교체된 토큰 줄을 지운다. 토큰을 새로 줄 때마다 불러 줄이 쌓이지 않게 한다."""
-    db.execute(
-        delete(RefreshToken).where(
-            RefreshToken.user_id == user_id,
-            or_(RefreshToken.expires_at <= now, RefreshToken.revoked_at <= now - REVOKED_TOKEN_RETENTION),
-        )
-    )
+    """이 회원의 만료된 토큰 줄을 지운다. 토큰을 새로 줄 때마다 불러 줄이 쌓이지 않게 한다.
+
+    교체된 줄은 만료될 때까지 남긴다. 먼저 지우면 그 뒤로는 새어 나간 토큰이 다시 와도 알아챌 수 없다.
+    (만료된 토큰은 어차피 쓸 수 없으므로 그때는 지워도 된다.)
+    """
+    db.execute(delete(RefreshToken).where(RefreshToken.user_id == user_id, RefreshToken.expires_at <= now))
 
 
 def _revoke_all(db: Session, user_id: uuid.UUID, now: datetime) -> None:

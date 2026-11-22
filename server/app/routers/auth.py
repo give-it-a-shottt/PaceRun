@@ -11,7 +11,7 @@ from app.errors import AppError, app_error_response
 from app.models import User
 from app.schemas.auth import AuthOut, LoginIn, RefreshIn, SignupIn, TokenOut, UserOut
 from app.services import auth_service
-from app.services.auth_service import TokenPair
+from app.services.auth_service import RefreshRaceError, TokenPair
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -47,6 +47,10 @@ def _deliver(response: Response, tokens: TokenPair, mode: str | None) -> TokenOu
     return TokenOut(access_token=tokens.access_token, refresh_token=None, expires_in=tokens.expires_in)
 
 
+def _clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(REFRESH_COOKIE, path=REFRESH_COOKIE_PATH)
+
+
 def _auth_out(response: Response, user: User, tokens: TokenPair, mode: str | None) -> AuthOut:
     delivered = _deliver(response, tokens, mode)
     return AuthOut(**delivered.model_dump(), user=UserOut.model_validate(user))
@@ -76,12 +80,15 @@ def refresh(
     token = cookie_token if mode == COOKIE_MODE else (body.refresh_token if body else None)
     try:
         tokens = auth_service.refresh(db, token)
+    except RefreshRaceError:
+        # 다른 탭이 방금 같은 토큰으로 갱신했다. 쿠키는 그 탭이 받은 새 토큰일 수 있으니 건드리지 않는다.
+        raise
     except AppError as error:
         if mode != COOKIE_MODE:
             raise
         # 못 쓰는 토큰이 든 쿠키를 브라우저에 남겨 두지 않는다(다음 요청마다 같은 실패를 되풀이하지 않게)
         failed = app_error_response(error)
-        failed.delete_cookie(REFRESH_COOKIE, path=REFRESH_COOKIE_PATH)
+        _clear_refresh_cookie(failed)
         return failed
     return _deliver(response, tokens, mode)
 
@@ -93,5 +100,6 @@ def logout(
     body: RefreshIn | None = None,
     cookie_token: RefreshCookie = None,
 ) -> None:
+    # 갱신과 달리 방식 헤더를 보지 않고, 쿠키와 본문 중 있는 것을 쓴다(로그아웃은 실수로 실패하면 안 된다)
     auth_service.logout(db, cookie_token or (body.refresh_token if body else None))
-    response.delete_cookie(REFRESH_COOKIE, path=REFRESH_COOKIE_PATH)
+    _clear_refresh_cookie(response)

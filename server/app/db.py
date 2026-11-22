@@ -12,7 +12,8 @@ from app.config import get_settings
 @lru_cache
 def get_engine() -> Engine:
     # pool_pre_ping: 끊긴 연결을 쓰기 전에 알아채고 다시 맺는다
-    return create_engine(get_settings().database_url, pool_pre_ping=True)
+    # hide_parameters: 오류 로그에 SQL에 넣은 값(이메일 · 해시)이 찍히지 않게 한다
+    return create_engine(get_settings().database_url, pool_pre_ping=True, hide_parameters=True)
 
 
 @lru_cache

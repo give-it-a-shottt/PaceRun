@@ -52,7 +52,7 @@ settings 테이블의 키 (`app/src/domain/types.ts`의 `Settings`, 값은 JSON 
 | 테이블 | 칸 | 제약 |
 |---|---|---|
 | users | id UUID PK · email(254자) · password_hash · weekly_goal · created_at | email UNIQUE(소문자로 저장), weekly_goal 2~5(기본 3) |
-| refresh_tokens | id UUID PK · user_id FK · token_hash(SHA-256, 64자) · expires_at · revoked_at · created_at | token_hash UNIQUE, user_id 인덱스(ix_refresh_tokens_user_id), user 삭제 시 함께 삭제. revoked_at은 교체된 시각(null이면 쓸 수 있음). 만료됐거나 교체된 지 하루 넘은 줄은 토큰을 새로 줄 때 지운다 |
+| refresh_tokens | id UUID PK · user_id FK · token_hash(SHA-256, 64자) · expires_at · revoked_at · created_at | token_hash UNIQUE, user_id 인덱스(ix_refresh_tokens_user_id), user 삭제 시 함께 삭제. revoked_at은 교체된 시각(null이면 쓸 수 있음). 만료된 줄은 토큰을 새로 줄 때 지운다. 교체된 줄은 새어 나간 토큰을 알아채는 근거라 만료될 때까지 남긴다. 로그아웃은 줄을 지운다 |
 | runs | id UUID PK(폰이 만든 번호) · user_id FK · mode · config JSONB · plan_label · started_at · ended_at · elapsed_s · distance_m · avg_pace_s_per_km · counted · segments JSONB · route JSONB · created_at · updated_at | 인덱스 (user_id, started_at DESC) |
 
 - route = `[[lat, lng, elapsed_s], …]`, segments = `[{idx, kind, started_elapsed_s, duration_s, distance_m}, …]`. 따로 테이블로 나누지 않고 한 칸에 둔다(D-007).

@@ -107,6 +107,12 @@ class TestLogin:
         assert wrong_password.json() == unknown_email.json()
         assert error_code(wrong_password) == "INVALID_CREDENTIALS"
 
+    def test_형식이_틀린_로그인_요청은_422(self, client: TestClient):
+        assert client.post(LOGIN, json={"email": "not-an-email", "password": PASSWORD}).status_code == 422
+        assert client.post(LOGIN, json={"email": EMAIL}).status_code == 422
+        # 73자 이상은 가입할 수 없는 길이라 해시를 돌리지 않고 422로 돌려보낸다
+        assert client.post(LOGIN, json={"email": EMAIL, "password": "a" * 73}).status_code == 422
+
 
 class TestMe:
     def test_토큰으로_내_정보를_읽는다(self, client: TestClient, signed_up: dict):
@@ -197,20 +203,44 @@ class TestRefresh:
         assert error_code(late) == "INVALID_REFRESH"
         assert client.post(REFRESH, json={"refresh_token": new}).status_code == 200
 
-    def test_토큰을_새로_줄_때_만료됐거나_오래전에_교체된_줄을_지운다(
-        self, client: TestClient, db: Session, signed_up: dict
-    ):
+    def test_교체된_지_며칠이_지난_토큰이_다시_와도_알아챈다(self, client: TestClient, db: Session, signed_up: dict):
+        """교체된 줄을 일찍 지우면 그 뒤로는 새어 나간 토큰을 알아챌 수 없다. 만료될 때까지 남겨 둔다."""
+        old = signed_up["refresh_token"]
+        new = client.post(REFRESH, json={"refresh_token": old}).json()["refresh_token"]
+        db.execute(
+            update(RefreshToken)
+            .where(RefreshToken.token_hash == hash_refresh_token(old))
+            .values(revoked_at=datetime.now(UTC) - timedelta(days=5))
+        )
+        db.commit()
+        # 그 사이 정상 사용자가 토큰을 한 번 더 갱신했다(이때 낡은 줄 정리가 돈다)
+        newer = client.post(REFRESH, json={"refresh_token": new}).json()["refresh_token"]
+
+        assert client.post(REFRESH, json={"refresh_token": old}).status_code == 401
+        assert client.post(REFRESH, json={"refresh_token": newer}).status_code == 401
+
+    def test_토큰을_새로_줄_때_만료된_줄만_지운다(self, client: TestClient, db: Session, signed_up: dict):
         token = signed_up["refresh_token"]
-        long_ago = datetime.now(UTC) - timedelta(days=2)
         for _ in range(3):
             token = client.post(REFRESH, json={"refresh_token": token}).json()["refresh_token"]
-        db.execute(update(RefreshToken).where(RefreshToken.revoked_at.is_not(None)).values(revoked_at=long_ago))
+        # 교체된 줄 3개 가운데 2개가 만료됐다고 하자
+        expired_ids = db.scalars(select(RefreshToken.id).where(RefreshToken.revoked_at.is_not(None)).limit(2)).all()
+        db.execute(
+            update(RefreshToken)
+            .where(RefreshToken.id.in_(expired_ids))
+            .values(expires_at=datetime.now(UTC) - timedelta(seconds=1))
+        )
         db.commit()
 
         client.post(REFRESH, json={"refresh_token": token})
 
-        # 방금 교체된 줄 1개 + 새 토큰 1개만 남는다
-        assert db.scalar(select(func.count()).select_from(RefreshToken)) == 2
+        # 만료 안 된 교체 줄 1개 + 방금 교체된 줄 1개 + 새 토큰 1개
+        assert db.scalar(select(func.count()).select_from(RefreshToken)) == 3
+
+    def test_너무_긴_리프레시_토큰은_422(self, client: TestClient):
+        response = client.post(REFRESH, json={"refresh_token": "a" * 513})
+        assert response.status_code == 422
+        assert error_code(response) == "VALIDATION"
 
     def test_만료된_리프레시_토큰은_401(self, client: TestClient, db: Session, signed_up: dict):
         token = signed_up["refresh_token"]
@@ -262,6 +292,26 @@ class TestCookieMode:
     def test_쿠키가_없으면_쿠키_방식_갱신은_401(self, client: TestClient):
         assert client.post(REFRESH, headers=COOKIE_MODE).status_code == 401
 
+    def test_동시에_갱신한_늦은_요청은_401이지만_쿠키를_지우지_않는다(self, client: TestClient):
+        """탭 두 개가 같은 쿠키로 동시에 갱신한 경우. 늦은 응답이 쿠키를 지우면 먼저 받은 새 쿠키까지 사라진다."""
+        client.post(SIGNUP, json={"email": EMAIL, "password": PASSWORD}, headers=COOKIE_MODE)
+        old = client.cookies.get("pr_refresh")
+        client.post(REFRESH, headers=COOKIE_MODE)
+        new = client.cookies.get("pr_refresh")
+
+        # 늦은 탭은 예전 쿠키를 들고 온다(테스트 클라이언트의 쿠키를 예전 값 하나로 바꿔 끼운다)
+        client.cookies.clear()
+        client.cookies.set("pr_refresh", old, path="/api/v1/auth")
+        late = client.post(REFRESH, headers=COOKIE_MODE)
+
+        assert late.status_code == 401
+        assert error_code(late) == "INVALID_REFRESH"
+        assert "set-cookie" not in late.headers
+        # 먼저 받은 새 쿠키로는 계속 갱신할 수 있다
+        client.cookies.clear()
+        client.cookies.set("pr_refresh", new, path="/api/v1/auth")
+        assert client.post(REFRESH, headers=COOKIE_MODE).status_code == 200
+
     def test_못_쓰는_쿠키로_갱신하면_401과_함께_쿠키를_지운다(self, client: TestClient):
         client.cookies.set("pr_refresh", "unknown-token", path="/api/v1/auth")
 
@@ -307,6 +357,17 @@ class TestLogout:
         # 노트북의 로그인은 그대로다
         assert client.post(REFRESH, json={"refresh_token": laptop}).status_code == 200
 
+    def test_이미_교체된_토큰으로_로그아웃해도_재사용_감지_근거는_남는다(
+        self, client: TestClient, db: Session, signed_up: dict
+    ):
+        old = signed_up["refresh_token"]
+        client.post(REFRESH, json={"refresh_token": old})
+
+        assert client.post(LOGOUT, json={"refresh_token": old}).status_code == 204
+
+        still_there = db.scalar(select(RefreshToken).where(RefreshToken.token_hash == hash_refresh_token(old)))
+        assert still_there is not None and still_there.revoked_at is not None
+
 
 class TestErrorFormat:
     def test_예상하지_못한_오류는_내부_사정_없이_500_INTERNAL로_답한다(self):
@@ -328,10 +389,37 @@ class TestErrorFormat:
         assert error_code(response) == "INTERNAL"
         assert "db-host" not in response.text and "secret-detail" not in response.text
 
+    def test_500_응답에도_CORS_헤더가_붙는다(self):
+        """헤더가 없으면 브라우저가 응답을 막아, 웹에서는 500이 아니라 네트워크 오류로 보인다."""
+        from app.db import get_db
+        from app.main import app
+
+        def broken_db():
+            raise RuntimeError("boom")
+
+        app.dependency_overrides[get_db] = broken_db
+        try:
+            with TestClient(app, raise_server_exceptions=False) as raw_client:
+                response = raw_client.post(
+                    LOGIN, json={"email": EMAIL, "password": PASSWORD}, headers={"Origin": "http://localhost:5173"}
+                )
+        finally:
+            app.dependency_overrides.clear()
+
+        assert response.status_code == 500
+        assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+
+    def test_허용하지_않는_요청_방식은_우리_에러_형식의_405(self, client: TestClient):
+        response = client.delete(ME)
+        assert response.status_code == 405
+        assert error_code(response) == "METHOD_NOT_ALLOWED"
+        assert response.json()["detail"]["message"] == "이 주소에서는 쓸 수 없는 요청 방식이에요"
+
     def test_없는_주소는_우리_에러_형식의_404(self, client: TestClient):
         response = client.get("/api/v1/nope")
         assert response.status_code == 404
         assert error_code(response) == "NOT_FOUND"
+        assert response.json()["detail"]["message"] == "요청한 주소를 찾을 수 없어요"
 
     def test_허용하지_않은_출처에는_CORS_헤더를_주지_않는다(self, client: TestClient):
         allowed = client.get("/health", headers={"Origin": "http://localhost:5173"})

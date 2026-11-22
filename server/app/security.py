@@ -12,6 +12,9 @@ from app.config import get_settings
 
 _password_hash = PasswordHash.recommended()  # argon2id
 
+# 리프레시 토큰의 무작위 바이트 수. 문자열로는 64자가 된다(요청에서 받는 상한은 schemas/auth.py의 512자).
+REFRESH_TOKEN_BYTES = 48
+
 # burn_password_check가 쓰는 가짜 해시. 서버가 뜰 때 한 번 만든다.
 _DUMMY_HASH = _password_hash.hash(secrets.token_urlsafe(16))
 
@@ -63,7 +66,7 @@ def decode_access_token(token: str) -> uuid.UUID | None:
 
 def new_refresh_token() -> tuple[str, str]:
     """(클라이언트에 줄 토큰, DB에 저장할 해시)를 돌려준다."""
-    token = secrets.token_urlsafe(48)
+    token = secrets.token_urlsafe(REFRESH_TOKEN_BYTES)
     return token, hash_refresh_token(token)
 
 

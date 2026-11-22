@@ -7,10 +7,11 @@
 
 import logging
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.base import RequestResponseEndpoint
 
 logger = logging.getLogger("pacerun")
 
@@ -45,6 +46,13 @@ _STATUS_CODES = {
     status.HTTP_405_METHOD_NOT_ALLOWED: "METHOD_NOT_ALLOWED",
 }
 
+_STATUS_MESSAGES = {
+    status.HTTP_401_UNAUTHORIZED: "로그인이 필요해요",
+    status.HTTP_403_FORBIDDEN: "권한이 없어요",
+    status.HTTP_404_NOT_FOUND: "요청한 주소를 찾을 수 없어요",
+    status.HTTP_405_METHOD_NOT_ALLOWED: "이 주소에서는 쓸 수 없는 요청 방식이에요",
+}
+
 
 def app_error_response(error: AppError) -> JSONResponse:
     """AppError를 응답으로 바꾼다. 라우터가 응답에 쿠키 삭제 같은 것을 더해야 할 때도 이 함수를 쓴다."""
@@ -72,14 +80,24 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(StarletteHTTPException)
     async def handle_http(_: Request, error: StarletteHTTPException) -> JSONResponse:
         code = _STATUS_CODES.get(error.status_code, "HTTP_ERROR")
-        message = error.detail if isinstance(error.detail, str) else "요청을 처리하지 못했어요"
+        # 프레임워크가 낸 오류(없는 주소 등)의 문구는 영어 기본값이라 우리 문구로 바꾼다
+        message = _STATUS_MESSAGES.get(error.status_code, "요청을 처리하지 못했어요")
         return JSONResponse(_body(code, message), status_code=error.status_code, headers=error.headers)
 
-    @app.exception_handler(Exception)
-    async def handle_unexpected(request: Request, error: Exception) -> JSONResponse:
-        # 내부 사정(스택, SQL)은 로그에만 남기고 응답에는 넣지 않는다
-        logger.exception("처리하지 못한 오류: %s %s", request.method, request.url.path, exc_info=error)
-        return JSONResponse(
-            _body("INTERNAL", "서버에 문제가 생겼어요. 잠시 뒤 다시 시도해 주세요"),
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
+    @app.middleware("http")
+    async def catch_unexpected(request: Request, call_next: RequestResponseEndpoint) -> Response:
+        """예상하지 못한 오류를 500 INTERNAL 응답으로 바꾼다.
+
+        예외 핸들러(@app.exception_handler(Exception))로 두면 CORS 처리보다 바깥에서 응답이 만들어져
+        CORS 헤더가 빠지고, 웹에서는 500이 아니라 "네트워크 오류"로 보인다. 그래서 미들웨어로 둔다.
+        (main.py에서 CORS 미들웨어를 이것보다 나중에 추가해 바깥을 감싸게 한다.)
+        """
+        try:
+            return await call_next(request)
+        except Exception:
+            # 내부 사정(스택, SQL)은 로그에만 남기고 응답에는 넣지 않는다
+            logger.exception("처리하지 못한 오류: %s %s", request.method, request.url.path)
+            return JSONResponse(
+                _body("INTERNAL", "서버에 문제가 생겼어요. 잠시 뒤 다시 시도해 주세요"),
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

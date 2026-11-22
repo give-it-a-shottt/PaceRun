@@ -19,11 +19,11 @@
 | 메서드 · 경로 | 인증 | 요청 | 성공 응답 | 에러 |
 |---|---|---|---|---|
 | POST /auth/signup | X | `{email, password}` (비밀번호 8~72자) | 201 `AuthOut` | 409 `EMAIL_TAKEN` |
-| POST /auth/login | X | `{email, password}` | 200 `AuthOut` | 401 `INVALID_CREDENTIALS` |
+| POST /auth/login | X | `{email, password}` | 200 `AuthOut` | 401 `INVALID_CREDENTIALS`, 422(형식 오류 · 비밀번호 73자 이상) |
 | POST /auth/refresh | X | 앱: `{refresh_token}` / 웹: 쿠키 + `X-Refresh-Mode: cookie` | 200 `TokenOut` | 401 `INVALID_REFRESH` |
 | POST /auth/logout | X | `{refresh_token}` 또는 쿠키 | 204 | — |
 | GET /me | O | — | 200 `UserOut` | |
-| PATCH /me | O | `{weekly_goal}` (2~5) | 200 `UserOut` | |
+| PATCH /me | O | `{weekly_goal}` (2~5) | 200 `UserOut` | 422(범위 밖) |
 
 - `UserOut` = `{id, email, weekly_goal}`
 - `TokenOut` = `{access_token, refresh_token, token_type: "bearer", expires_in}`. `expires_in`은 액세스 토큰의 유효 시간(초). 쿠키 방식에서는 `refresh_token`이 null이다.
@@ -32,10 +32,11 @@
   - 앱(기본): 응답 본문의 `refresh_token`으로 받고, 갱신 · 로그아웃 때 본문에 넣어 보낸다.
   - 웹(쿠키 방식): signup · login · refresh 요청에 `X-Refresh-Mode: cookie` 헤더를 붙인다. 그러면 본문의 `refresh_token`은 null이고 httpOnly 쿠키 `pr_refresh`(경로 `/api/v1/auth`, SameSite=Lax)로만 온다. 요청은 쿠키를 싣도록 보낸다(fetch `credentials: "include"`). logout은 쿠키의 토큰을 폐기하고 쿠키를 지운다.
 - 한 번 쓴 리프레시 토큰은 다시 쓸 수 없다(401 `INVALID_REFRESH`).
-  - 교체된 지 10초가 넘은 토큰이 다시 오면 새어 나간 것으로 보고 그 회원의 토큰을 모두 폐기한다(모든 기기에서 다시 로그인).
+  - 교체된 지 10초가 넘은 토큰이 다시 오면 새어 나간 것으로 보고 그 회원의 토큰을 모두 폐기한다(모든 기기에서 다시 로그인). 교체된 기록은 그 토큰이 만료될 때(30일)까지 남으므로 그동안은 언제 와도 알아챈다.
   - 교체된 지 10초 안이면 같은 사용자의 동시 요청(브라우저 탭 2개 등)으로 보고 401만 준다. 다른 토큰은 그대로다.
-  - 로그아웃한 토큰은 지워지므로 다시 와도 401만 준다.
-  - 쿠키 방식에서 갱신이 401이면 서버가 `pr_refresh` 쿠키도 지운다.
+  - 로그아웃한 토큰은 지워지므로 다시 와도 401만 준다. 이미 교체된 토큰으로 로그아웃하면 기록은 남는다.
+  - 쿠키 방식에서 갱신이 401이면 서버가 `pr_refresh` 쿠키도 지운다. 단, 동시 요청으로 본 경우(10초 안)는 지우지 않는다 — 다른 탭이 방금 받은 새 쿠키일 수 있다.
+- `pr_refresh` 쿠키의 Secure 속성은 환경변수 `COOKIE_SECURE`로 켠다(운영 HTTPS에서는 true).
 
 ### 러닝
 
