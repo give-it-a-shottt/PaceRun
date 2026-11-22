@@ -11,7 +11,7 @@
 - 주소 앞부분: `/api/v1`
 - 인증: `Authorization: Bearer <액세스 토큰>`. "인증" 칸이 O인 요청에 필요하다.
 - 에러 형식: `{"detail": {"code": "대문자_코드", "message": "사용자에게 보여 줄 말"}}`. 입력 오류(422)는 `fields: [{field, message}]`가 더 붙는다.
-- 공통 에러: 401 `UNAUTHORIZED`(토큰 없음 · 만료 · 틀림), 422 `VALIDATION`.
+- 공통 에러: 401 `UNAUTHORIZED`(토큰 없음 · 만료 · 틀림), 404 `NOT_FOUND`, 422 `VALIDATION`, 500 `INTERNAL`.
 
 ### 인증
 
@@ -19,15 +19,18 @@
 |---|---|---|---|---|
 | POST /auth/signup | X | `{email, password}` (비밀번호 8~72자) | 201 `AuthOut` | 409 `EMAIL_TAKEN` |
 | POST /auth/login | X | `{email, password}` | 200 `AuthOut` | 401 `INVALID_CREDENTIALS` |
-| POST /auth/refresh | X | `{refresh_token}` 또는 쿠키 | 200 `TokenOut` | 401 `INVALID_REFRESH` |
+| POST /auth/refresh | X | 앱: `{refresh_token}` / 웹: 쿠키 + `X-Refresh-Mode: cookie` | 200 `TokenOut` | 401 `INVALID_REFRESH` |
 | POST /auth/logout | X | `{refresh_token}` 또는 쿠키 | 204 | — |
 | GET /me | O | — | 200 `UserOut` | |
 | PATCH /me | O | `{weekly_goal}` (2~5) | 200 `UserOut` | |
 
 - `UserOut` = `{id, email, weekly_goal}`
-- `TokenOut` = `{access_token, refresh_token, token_type: "bearer", expires_in}`
+- `TokenOut` = `{access_token, refresh_token, token_type: "bearer", expires_in}`. `expires_in`은 액세스 토큰의 유효 시간(초). 쿠키 방식에서는 `refresh_token`이 null이다.
 - `AuthOut` = `TokenOut` + `{user: UserOut}`
-- 웹은 리프레시 토큰을 httpOnly 쿠키(`pr_refresh`)로 받는다. signup · login · refresh가 쿠키도 함께 내려 주고 logout이 지운다. 앱은 본문의 `refresh_token`을 쓴다(D-006).
+- 리프레시 토큰을 받는 방식은 두 가지다(D-006).
+  - 앱(기본): 응답 본문의 `refresh_token`으로 받고, 갱신 · 로그아웃 때 본문에 넣어 보낸다.
+  - 웹(쿠키 방식): signup · login · refresh 요청에 `X-Refresh-Mode: cookie` 헤더를 붙인다. 그러면 본문의 `refresh_token`은 null이고 httpOnly 쿠키 `pr_refresh`(경로 `/api/v1/auth`, SameSite=Lax)로만 온다. 요청은 쿠키를 싣도록 보낸다(fetch `credentials: "include"`). logout은 쿠키의 토큰을 폐기하고 쿠키를 지운다.
+- 한 번 쓴 리프레시 토큰은 다시 쓸 수 없다. 이미 쓴 토큰이 다시 오면 그 회원의 토큰을 모두 폐기한다(다시 로그인해야 함).
 
 ### 러닝
 
