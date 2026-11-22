@@ -9,7 +9,7 @@
 
 ```
 [폰 앱 app/]                         [서버 server/]              [웹 web/]
-화면(src/app) ─ 상태 ─ 서비스         라우터 → 서비스 → DB(모델)    화면 → API 호출(TanStack Query)
+화면(src/app) ─ state ─ 서비스        라우터 → 서비스 → DB(모델)    화면 → API 호출(TanStack Query)
         │              │                    ▲                          │
         ▼              ▼                    │ HTTPS · JWT              │
    순수 로직(domain)  SQLite(db) ── 동기화 ──┘◄─────────────────────────┘
@@ -20,12 +20,14 @@
 - `app/src/domain/` — 순수 TypeScript 로직. React · Expo를 import하지 않는다(단위 테스트 대상).
 - `app/src/services/` — 기기 기능을 감싼 것: 위치 기록, 음성 · 메트로놈, 알림, 동기화.
 - `app/src/db/` — expo-sqlite 스키마와 쿼리.
+- `app/src/state/` — 화면 여러 곳이 함께 보는 메모리 상태(zustand): 설정, 토스트. DB나 서비스를 불러 값을 채운다.
+- `app/plugins/` — 네이티브 빌드 설정을 덧붙이는 설정 플러그인(`android/`는 만들어지는 산출물이라 직접 고치지 않는다).
 - `app/src/theme/` · `app/src/components/` — 디자인 토큰과 공용 컴포넌트.
 - `server/app/routers/` → `server/app/services/` → `server/app/models/` — 의존은 이 방향으로만 흐른다. 라우터에는 요청 · 응답 변환만 둔다.
 - `web/src/pages/` · `web/src/api/` · `web/src/components/`.
 
 의존 방향 규칙
-- 앱: 화면 → 서비스 → domain / db. domain은 아무것도 의존하지 않는다.
+- 앱: 화면 → state · 서비스 → db → domain. domain은 아무것도 의존하지 않는다(React · Expo · DB를 import하지 않음).
 - 서버: 라우터 → 서비스 → 모델. 서비스는 FastAPI의 Request · Response를 모른다.
 - 세 폴더는 서로의 코드를 import하지 않는다(D-003). 계약은 overview/api-list.md다.
 

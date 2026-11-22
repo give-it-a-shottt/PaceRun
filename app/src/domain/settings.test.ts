@@ -33,4 +33,36 @@ describe('mergeSettings', () => {
     expect(merged).toEqual(DEFAULT_SETTINGS);
     expect('unknownKey' in merged).toBe(false);
   });
+
+  it('객체 기본 이름(constructor 등)을 키로 받아도 무시한다', () => {
+    const merged = mergeSettings([
+      { key: 'constructor', value: '1' },
+      { key: 'toString', value: '"x"' },
+    ]);
+    expect(merged).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it('JSON은 맞지만 타입이나 범위가 틀린 값은 기본값으로 둔다', () => {
+    const merged = mergeSettings([
+      { key: 'weeklyGoal', value: '9' },
+      { key: 'voiceEnabled', value: '"yes"' },
+      { key: 'runTheme', value: '"dark"' },
+      { key: 'reminderTime', value: '"25:00"' },
+      { key: 'defaultCadenceSpm', value: '"170"' },
+      { key: 'lastRunConfig', value: '{"mode":"interval","runSec":60}' },
+      { key: 'onboardingDone', value: 'null' },
+    ]);
+    expect(merged).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it('범위 안의 값과 올바른 시간 형식은 받는다', () => {
+    const merged = mergeSettings([
+      { key: 'weeklyGoal', value: '2' },
+      { key: 'reminderTime', value: '"07:30"' },
+      { key: 'lastRunConfig', value: '{"mode":"free","targetDurationSec":600}' },
+    ]);
+    expect(merged.weeklyGoal).toBe(2);
+    expect(merged.reminderTime).toBe('07:30');
+    expect(merged.lastRunConfig).toEqual({ mode: 'free', targetDurationSec: 600 });
+  });
 });

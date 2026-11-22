@@ -25,19 +25,22 @@
 
 ## 결과 (AI 작성 — 구현 후)
 - 바뀐 파일
-  - 설정: `app/app.json`(이름 · 패키지 · 권한 · 플러그인), `app/package.json`, `app/vitest.config.mts`, `app/scripts/vitest.mjs`
+  - 설정: `app/app.json`(이름 · 패키지 · 권한 · 플러그인), `app/package.json`, `app/tsconfig.json`, `app/vitest.config.mts`, `app/scripts/vitest.mjs`, `app/plugins/withCmakeVersion.js`
   - 테마: `app/src/theme/tokens.ts`, `ThemeContext.tsx`
-  - 공용 부품: `app/src/components/` AppText · Button · Card · TopBar · DockBar · BottomSheet · AlertDialog · Toast · Screen · ComingSoon
-  - DB: `app/src/db/schema.ts`(스키마 · 단계별 변경), `database.ts`(연결 · 단계 적용), `settingsRepo.ts`
-  - 로직 · 상태: `app/src/domain/types.ts`, `settings.ts`, `app/src/state/settingsStore.ts`
+  - 공용 부품: `app/src/components/` AppText · Button · Card · TopBar · DockBar · BottomSheet · AlertDialog · Toast · Screen · ComingSoon · icons(아이콘을 하나씩 가져오는 곳)
+  - DB: `app/src/db/schema.ts`(스키마 · 단계별 변경), `migrate.ts`(단계 적용), `database.ts`(연결), `settingsRepo.ts`
+  - 로직 · 상태: `app/src/domain/types.ts`, `settings.ts`, `app/src/state/settingsStore.ts`, `toastStore.ts`
   - 라우트: `app/src/app/_layout.tsx`, `index.tsx`, `(tabs)/_layout.tsx`, `(tabs)/home · plan · records · my.tsx`
-  - 테스트: `app/src/domain/settings.test.ts`, `app/src/db/schema.test.ts`
+  - 테스트: `app/src/domain/settings.test.ts`, `app/src/db/schema.test.ts`, `migrate.test.ts`, `app/src/state/settingsStore.test.ts`
 - 실제 구조
   - 루트 레이아웃이 설정을 DB에서 읽을 때까지 스플래시를 붙잡고, 읽은 뒤 Light 테마로 화면을 그린다.
   - DB 연결은 React 밖에서도 쓸 수 있게 모듈 하나(`getDb`)로 둔다. 스키마 변경은 `PRAGMA user_version`으로 단계를 세어 모자란 단계만 적용한다.
-  - 설정은 메모리(zustand)에 한 벌 두고, 바꿀 때마다 DB에 저장한다. 저장에 실패하면 화면 값을 되돌린다.
+  - 설정은 메모리(zustand)에 한 벌 두고, 바꿀 때마다 DB에 저장한다. 저장에 실패하면 그 값만 되돌리고 토스트로 알린다. 처음 읽기에 실패하면 기본값으로 진행하지 않고 '다시 시도' 화면에서 멈춘다.
   - 탭은 expo-router의 JS 탭에 직접 만든 Dock Bar를 끼웠다.
 - 설계 의도와 다른 점
+  - 뒤 기능(F-002~F-010)이 쓸 권한 · 플러그인(백그라운드 위치, 알림, 오디오, 보안 저장소)과 패키지를 `app.json` · `package.json`에 미리 넣었다. 네이티브 설정을 바꿀 때마다 개발 빌드를 다시 만들어야 해서 한 번에 넣었다.
+  - 네이티브 빌드용 CMake 버전을 3.31.6으로 고정하는 플러그인(`app/plugins/withCmakeVersion.js`)을 추가했다(T-002).
+  - 템플릿에 딸려 온 패키지 중 안 쓰는 것(웹용 · 제스처 · 애니메이션 등 11개)을 지웠다.
   - Dark 색 가운데 피그마 Dark 프레임에 나오지 않는 토큰은 Light 값을 물려받게 했다(러닝 화면에서 쓰지 않는 토큰).
   - 입력 오류 문구 색(statusErrorText)은 피그마 변수에 없어 임시 값을 넣었다.
 
@@ -50,4 +53,4 @@
 ## 면접 예상 질문
 (1차 리뷰 뒤 작성)
 
-최종 수정: 2026-11-22 · 관련: D-001, D-003, D-004, T-001
+최종 수정: 2026-11-22 · 관련: D-001, D-003, D-004, T-001, T-002

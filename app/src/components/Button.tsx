@@ -1,11 +1,11 @@
 import type { ComponentType } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
-import type { IconProps } from 'phosphor-react-native';
 
 import { useTheme } from '@/theme/ThemeContext';
 import { radius, space, type Colors } from '@/theme/tokens';
 
 import { AppText } from './AppText';
+import type { IconProps } from './icons';
 
 /**
  * primary = Plum(주 행동, 한 영역에 1개) / strong = 반전(러닝 화면 Light의 주 행동) /

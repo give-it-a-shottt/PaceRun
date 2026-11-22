@@ -1,12 +1,12 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { CaretLeftIcon } from 'phosphor-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/theme/ThemeContext';
 import { layout, space } from '@/theme/tokens';
 
 import { AppText } from './AppText';
+import { CaretLeftIcon } from './icons';
 
 type Props =
   | { variant: 'logo' }

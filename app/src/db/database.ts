@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 
+import { runMigrations } from './migrate';
 import { MIGRATIONS } from './schema';
 
 const DATABASE_NAME = 'pacerun.db';
@@ -24,21 +25,20 @@ export function getDb(): Promise<SQLite.SQLiteDatabase> {
 async function open(): Promise<SQLite.SQLiteDatabase> {
   const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
-  await migrate(db);
+  await runMigrations(
+    {
+      getVersion: async () => {
+        const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+        return row?.user_version ?? 0;
+      },
+      // 한 단계는 전부 되거나 전부 안 되게 트랜잭션으로 묶는다
+      applyStep: (sql, version) =>
+        db.withExclusiveTransactionAsync(async (txn) => {
+          await txn.execAsync(sql);
+          await txn.execAsync(`PRAGMA user_version = ${version}`);
+        }),
+    },
+    MIGRATIONS,
+  );
   return db;
-}
-
-/** PRAGMA user_version에 적용한 단계 수를 적어 두고, 모자란 단계만 차례로 적용한다. */
-async function migrate(db: SQLite.SQLiteDatabase): Promise<void> {
-  const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
-  const current = row?.user_version ?? 0;
-
-  for (let version = current; version < MIGRATIONS.length; version++) {
-    const sql = MIGRATIONS[version];
-    // 한 단계는 전부 되거나 전부 안 되게 한다
-    await db.withExclusiveTransactionAsync(async (txn) => {
-      await txn.execAsync(sql);
-      await txn.execAsync(`PRAGMA user_version = ${version + 1}`);
-    });
-  }
 }

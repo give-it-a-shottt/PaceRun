@@ -1,36 +1,18 @@
-import { create } from 'zustand';
 import { useEffect } from 'react';
 import { AccessibilityInfo, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useToastStore } from '@/state/toastStore';
 import { useTheme } from '@/theme/ThemeContext';
-import { radius, space } from '@/theme/tokens';
+import { layout, radius, space } from '@/theme/tokens';
 
 import { AppText } from './AppText';
 
 const TOAST_DURATION_MS = 3000;
+/** 하단 Dock Bar(탭 56 + 안전 영역)나 하단 버튼에 가리지 않게 띄우는 높이 */
+const TOAST_BOTTOM_OFFSET = layout.dockTabHeight + layout.bottomSafePadding + space[1.5];
 
-type ToastState = {
-  message: string | null;
-  /** 같은 문구를 연달아 띄워도 타이머가 다시 돌도록 구분하는 번호 */
-  seq: number;
-  show: (message: string) => void;
-  hide: () => void;
-};
-
-const useToastStore = create<ToastState>((set) => ({
-  message: null,
-  seq: 0,
-  show: (message) => set((s) => ({ message, seq: s.seq + 1 })),
-  hide: () => set({ message: null }),
-}));
-
-/** 어디서든 부를 수 있는 토스트(3초). 예: `showToast('GPS 신호를 찾는 중')` */
-export function showToast(message: string) {
-  useToastStore.getState().show(message);
-}
-
-/** 루트 레이아웃에 한 번만 둔다. */
+/** 토스트를 실제로 그리는 곳. 루트 레이아웃에 한 번만 둔다. 띄울 때는 `showToast`를 쓴다. */
 export function ToastHost() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -48,7 +30,7 @@ export function ToastHost() {
   if (!message) return null;
 
   return (
-    <View pointerEvents="none" style={[styles.host, { bottom: insets.bottom + 96 }]}>
+    <View pointerEvents="none" style={[styles.host, { bottom: insets.bottom + TOAST_BOTTOM_OFFSET }]}>
       <View style={[styles.toast, { backgroundColor: colors.bgInverse }]}>
         <AppText variant="body14M" color="textInverse">
           {message}

@@ -21,6 +21,22 @@
 - mode = free / interval / cadence / pacemaker. config_json은 모드별 목표값(예: 인터벌 runSec · walkSec · repeats).
 - 로그인 토큰은 SQLite가 아니라 expo-secure-store에 둔다.
 
+settings 테이블의 키 (`app/src/domain/types.ts`의 `Settings`, 값은 JSON 문자열)
+
+| 키 | 값 | 기본값 |
+|---|---|---|
+| weeklyGoal | 정수 2~5 | 3 |
+| reminderTime | "HH:mm" 또는 null(끔) | null |
+| voiceEnabled | true / false | true |
+| voiceIntervalKm | 정수 1~10 (자유 모드에서 몇 km마다 말할지) | 1 |
+| defaultCadenceSpm | 정수 120~220 | 170 |
+| runTheme | "auto"(OS 설정 따름) / "light"(항상 밝게) | "auto" |
+| onboardingDone | true / false | false |
+| lastRunConfig | 모드별 목표값 객체 또는 null | null |
+| lastSyncAt | epoch 밀리초 또는 null | null |
+
+- 읽을 때 타입 · 범위가 틀린 값과 모르는 키는 버리고 기본값을 쓴다(`app/src/domain/settings.ts`).
+
 ### 서버 (Postgres, `server/app/models/`)
 
 | 테이블 | 칸 | 제약 |
