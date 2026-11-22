@@ -1,0 +1,57 @@
+# API 목록
+
+## 한눈에 보기 (코드 몰라도 OK)
+상태: [통과]
+무엇을: 앱과 웹이 서버에 보내는 요청은 세 묶음이다. ① 가입 · 로그인 ② 러닝 올리기 · 받기 ③ 대시보드 통계. 💡 비유: 은행 창구 번호표 — 어떤 창구(주소)에 어떤 서류(요청)를 내면 무엇(응답)을 돌려받는지 적은 표다.
+왜: 앱 · 웹 · 서버가 따로 만들어져도 같은 약속을 보게 하려고.
+
+## 개발자 상세
+
+공통
+- 주소 앞부분: `/api/v1`
+- 인증: `Authorization: Bearer <액세스 토큰>`. "인증" 칸이 O인 요청에 필요하다.
+- 에러 형식: `{"detail": {"code": "대문자_코드", "message": "사용자에게 보여 줄 말"}}`. 입력 오류(422)는 `fields: [{field, message}]`가 더 붙는다.
+- 공통 에러: 401 `UNAUTHORIZED`(토큰 없음 · 만료 · 틀림), 422 `VALIDATION`.
+
+### 인증
+
+| 메서드 · 경로 | 인증 | 요청 | 성공 응답 | 에러 |
+|---|---|---|---|---|
+| POST /auth/signup | X | `{email, password}` (비밀번호 8~72자) | 201 `AuthOut` | 409 `EMAIL_TAKEN` |
+| POST /auth/login | X | `{email, password}` | 200 `AuthOut` | 401 `INVALID_CREDENTIALS` |
+| POST /auth/refresh | X | `{refresh_token}` 또는 쿠키 | 200 `TokenOut` | 401 `INVALID_REFRESH` |
+| POST /auth/logout | X | `{refresh_token}` 또는 쿠키 | 204 | — |
+| GET /me | O | — | 200 `UserOut` | |
+| PATCH /me | O | `{weekly_goal}` (2~5) | 200 `UserOut` | |
+
+- `UserOut` = `{id, email, weekly_goal}`
+- `TokenOut` = `{access_token, refresh_token, token_type: "bearer", expires_in}`
+- `AuthOut` = `TokenOut` + `{user: UserOut}`
+- 웹은 리프레시 토큰을 httpOnly 쿠키(`pr_refresh`)로 받는다. signup · login · refresh가 쿠키도 함께 내려 주고 logout이 지운다. 앱은 본문의 `refresh_token`을 쓴다(D-006).
+
+### 러닝
+
+| 메서드 · 경로 | 인증 | 요청 | 성공 응답 | 에러 |
+|---|---|---|---|---|
+| PUT /runs/{id} | O | `RunIn` | 201(새로 저장) 또는 200(이미 있어 덮어씀) `RunSummary` | 409 `RUN_ID_CONFLICT`(다른 회원의 번호) |
+| GET /runs | O | 쿼리 `limit`(1~100, 기본 20), `cursor` | 200 `{items: RunSummary[], next_cursor}` | |
+| GET /runs/{id} | O | — | 200 `RunDetail` | 404 `RUN_NOT_FOUND`(없거나 남의 것) |
+
+- `RunIn` = `{mode, config, plan_label, started_at, ended_at, elapsed_s, distance_m, avg_pace_s_per_km, counted, segments, route}`
+- `RunSummary` = `{id, mode, config, plan_label, started_at, ended_at, elapsed_s, distance_m, avg_pace_s_per_km, counted}`
+- `RunDetail` = `RunSummary` + `{segments, route}`
+- mode ∈ free · interval · cadence · pacemaker. started_at · ended_at은 시간대가 붙은 ISO 8601.
+- route는 `[lat, lng, elapsed_s]` 배열(최대 20000개), segments는 `{idx, kind, started_elapsed_s, duration_s, distance_m}` 배열.
+- 목록은 started_at 최신순. `next_cursor`가 null이면 끝이다.
+
+### 통계 (웹 대시보드)
+
+| 메서드 · 경로 | 인증 | 요청 | 성공 응답 |
+|---|---|---|---|
+| GET /stats | O | 쿼리 `period`(month · year), `anchor`(YYYY-MM-DD, 기본 오늘), `tz`(기본 Asia/Seoul) | 200 `StatsOut` |
+
+- `StatsOut` = `{period, start, end, buckets: [{label, start, distance_m, count, elapsed_s}], totals: {distance_m, count, elapsed_s}, goal_weeks: {achieved, total}, weekly_goal}`
+- month는 날짜별, year는 월별 묶음이다. count는 10분 인정된 러닝 수다.
+- goal_weeks는 기간과 겹치는 주(월요일 시작) 가운데 인정 횟수가 주 목표 이상인 주의 수다.
+
+최종 수정: 2026-11-22 · 관련: F-008, F-009, D-006, D-007
