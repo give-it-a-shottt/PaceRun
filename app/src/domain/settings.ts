@@ -10,6 +10,10 @@ import {
 const REMINDER_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const CADENCE_SPM_MIN = 120;
 const CADENCE_SPM_MAX = 220;
+const VOICE_INTERVAL_KM_MIN = 1;
+const VOICE_INTERVAL_KM_MAX = 10;
+const INTERVAL_REPEATS_MIN = 1;
+const INTERVAL_REPEATS_MAX = 99;
 
 function isInt(value: unknown, min: number, max: number): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max;
@@ -28,7 +32,7 @@ export function isRunConfig(value: unknown): value is RunConfig {
     case 'free':
       return v.targetDurationSec === null || isPositive(v.targetDurationSec);
     case 'interval':
-      return isPositive(v.runSec) && isPositive(v.walkSec) && isInt(v.repeats, 1, 99);
+      return isPositive(v.runSec) && isPositive(v.walkSec) && isInt(v.repeats, INTERVAL_REPEATS_MIN, INTERVAL_REPEATS_MAX);
     case 'cadence':
       return isInt(v.spm, CADENCE_SPM_MIN, CADENCE_SPM_MAX) && isPositive(v.durationSec);
     case 'pacemaker':
@@ -43,7 +47,7 @@ const VALIDATORS: { [K in keyof Settings]: (value: unknown) => boolean } = {
   weeklyGoal: (v) => isInt(v, WEEKLY_GOAL_MIN, WEEKLY_GOAL_MAX),
   reminderTime: (v) => v === null || (typeof v === 'string' && REMINDER_TIME_PATTERN.test(v)),
   voiceEnabled: (v) => typeof v === 'boolean',
-  voiceIntervalKm: (v) => isInt(v, 1, 10),
+  voiceIntervalKm: (v) => isInt(v, VOICE_INTERVAL_KM_MIN, VOICE_INTERVAL_KM_MAX),
   defaultCadenceSpm: (v) => isInt(v, CADENCE_SPM_MIN, CADENCE_SPM_MAX),
   runTheme: (v) => v === 'auto' || v === 'light',
   onboardingDone: (v) => typeof v === 'boolean',

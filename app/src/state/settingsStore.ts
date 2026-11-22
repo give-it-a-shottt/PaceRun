@@ -29,7 +29,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     try {
       const settings = await loadSettings();
       set({ settings, status: 'ready' });
-    } catch {
+    } catch (error) {
+      console.warn('[settings] 설정을 읽지 못했어요', error);
       set({ status: 'failed' });
     }
   },
@@ -39,7 +40,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set((s) => ({ settings: { ...s.settings, [key]: value } }));
     try {
       await saveSetting(key, value);
-    } catch {
+    } catch (error) {
+      console.warn('[settings] 설정을 저장하지 못했어요', key, error);
       // 저장에 실패하면 이 키만 되돌린다. 그 사이 바꾼 다른 키와, 이 키를 다시 바꾼 값은 건드리지 않는다.
       set((s) => ({
         settings: s.settings[key] === value ? { ...s.settings, [key]: previousValue } : s.settings,

@@ -46,6 +46,10 @@ export const lightColors = {
   badgePlumSoft: '#f6eff2',
   badgeBlackText: '#212121',
   badgeBlackSoft: '#f2f2f2',
+  badgeBlueText: '#1e5bb8',
+  badgeBlueSoft: '#e8f1fd',
+  badgeGreenText: '#1b7a3a',
+  badgeGreenSoft: '#e8f5ec',
 
   statusSuccessBase: '#2e9e6a',
   statusSuccessText: '#1e6b47',
@@ -75,6 +79,8 @@ export const darkColors: Colors = {
   iconInverse: '#18181d',
 
   bgDefault: '#18181d',
+  bgLight: '#111115',
+  bgRegular: '#26262d',
   bgInverse: '#f2f2f5',
 
   lineLight: '#232329',
@@ -100,6 +106,7 @@ export const space = {
   5: 20,
   6: 24,
   8: 32,
+  12: 48,
 } as const;
 
 export const radius = {
@@ -110,6 +117,16 @@ export const radius = {
   modal: 16,
   sheet: 20,
   full: 999,
+} as const;
+
+/** 피그마 효과 스타일. RN의 boxShadow 문자열로 옮겼다. */
+export const shadow = {
+  /** Shadow/Dock (0, -4, 8, #0000000A) */
+  dock: '0px -4px 8px rgba(0, 0, 0, 0.04)',
+  /** Shadow/4 (0, 6, 12, #2121211F) — 바텀시트 · 확인 창 */
+  elevated: '0px 6px 12px rgba(33, 33, 33, 0.12)',
+  /** Shadow/3 (0, 4, 8, #2121211A) — 토스트 */
+  toast: '0px 4px 8px rgba(33, 33, 33, 0.1)',
 } as const;
 
 /** 화면 좌우 여백(MO 20)과 러닝 화면 하단 버튼 영역의 제스처 바 여백. */

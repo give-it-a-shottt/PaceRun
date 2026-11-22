@@ -2,7 +2,7 @@ import type { ComponentType } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useTheme } from '@/theme/ThemeContext';
-import { radius, space, type Colors } from '@/theme/tokens';
+import { radius, space, type Colors, type TypographyName } from '@/theme/tokens';
 
 import { AppText } from './AppText';
 import type { IconProps } from './icons';
@@ -22,6 +22,8 @@ type Props = {
   variant?: ButtonVariant;
   size?: ButtonSize;
   icon?: ComponentType<IconProps>;
+  /** 아이콘 굵기. 기본은 면(fill)이고, 피그마에서 선으로 그린 아이콘만 regular로 준다. */
+  iconWeight?: 'regular' | 'fill';
   disabled?: boolean;
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -29,6 +31,8 @@ type Props = {
 };
 
 const HEIGHT: Record<ButtonSize, number> = { L: 48, XL: 56 };
+const LABEL: Record<ButtonSize, TypographyName> = { L: 'title16SB', XL: 'title18SB' };
+const PADDING_X: Record<ButtonSize, number> = { L: space[5], XL: space[6] };
 
 function palette(variant: ButtonVariant, colors: Colors, pressed: boolean) {
   switch (variant) {
@@ -36,12 +40,13 @@ function palette(variant: ButtonVariant, colors: Colors, pressed: boolean) {
       return {
         bg: pressed ? colors.primaryPressed : colors.primaryDefault,
         fg: colors.textOnPrimary,
+        icon: colors.iconOnPrimary,
         border: undefined,
       };
     case 'strong':
-      return { bg: colors.bgInverse, fg: colors.textInverse, border: undefined };
+      return { bg: colors.bgInverse, fg: colors.textInverse, icon: colors.iconInverse, border: undefined };
     case 'outlineStrong':
-      return { bg: colors.bgDefault, fg: colors.textMain, border: colors.lineBlack };
+      return { bg: colors.bgDefault, fg: colors.textMain, icon: colors.iconMain, border: colors.lineBlack };
   }
 }
 
@@ -53,6 +58,7 @@ export function Button({
   variant = 'primary',
   size = 'L',
   icon: Icon,
+  iconWeight = 'fill',
   disabled,
   loading,
   style,
@@ -79,6 +85,7 @@ export function Button({
           styles.base,
           {
             height: HEIGHT[size],
+            paddingHorizontal: PADDING_X[size],
             backgroundColor: p.bg,
             borderColor: p.border,
             borderWidth,
@@ -93,8 +100,8 @@ export function Button({
           <ActivityIndicator color={p.fg} />
         ) : (
           <>
-            {Icon ? <Icon size={20} color={p.fg} weight="fill" /> : null}
-            <AppText variant="title16SB" style={{ color: p.fg }}>
+            {Icon ? <Icon size={20} color={p.icon} weight={iconWeight} /> : null}
+            <AppText variant={LABEL[size]} style={{ color: p.fg }}>
               {label}
             </AppText>
           </>
@@ -110,7 +117,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: space[2],
-    paddingHorizontal: space[5],
     borderRadius: radius.button,
     alignSelf: 'stretch',
   },

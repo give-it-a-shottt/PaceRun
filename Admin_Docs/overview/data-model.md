@@ -16,9 +16,19 @@
 | run_segments | run_id FK · idx · kind · started_elapsed_ms · duration_ms · distance_m (PK run_id+idx) | 구간 기록. kind = run / walk(인터벌) 또는 km(1km 구간) |
 | plan_items | weekday PK(0=월 … 6=일) · mode · config_json · label | 매주 반복되는 계획 1개. 요일당 운동 1개 |
 | settings | key PK · value(JSON) | 주 목표, 알림 시간, 음성 안내, 기본 케이던스, 러닝 화면 테마, 온보딩 완료, 마지막 설정, 마지막 동기화 |
+| active_run | id PK(항상 1) · state_json · saved_at | 진행 중인 러닝의 계산 상태 한 벌. 러닝 중 약 1초마다 덮어쓰고 끝나면 지운다. 앱이 꺼졌다 켜졌을 때 복구에 쓴다(스키마 2단계) |
 
 - 시간은 모두 epoch 밀리초(INTEGER). 거리는 미터, 페이스는 km당 초.
-- mode = free / interval / cadence / pacemaker. config_json은 모드별 목표값(예: 인터벌 runSec · walkSec · repeats).
+- mode = free / interval / cadence / pacemaker. config_json은 모드별 목표값이다(`app/src/domain/types.ts`의 `RunConfig`).
+
+| mode | config_json의 칸 | 범위 |
+|---|---|---|
+| free | targetDurationSec (초, 제한 없으면 null) | 양수 |
+| interval | runSec · walkSec (초) · repeats (반복 수) | 양수 · repeats 1~99 |
+| cadence | spm (분당 걸음 수) · durationSec (초) | spm 120~220(소리 파일은 150~190, 5 단위) |
+| pacemaker | targetPaceSecPerKm (km당 초) · distanceM (미터) | 양수 |
+
+- 서버 API에서는 같은 값을 snake_case로 주고받는다(예: `runSec` ↔ `run_sec`, api-list.md "러닝").
 - 로그인 토큰은 SQLite가 아니라 expo-secure-store에 둔다.
 
 settings 테이블의 키 (`app/src/domain/types.ts`의 `Settings`, 값은 JSON 문자열)

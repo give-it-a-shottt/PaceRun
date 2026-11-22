@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '@/theme/ThemeContext';
-import { layout, space } from '@/theme/tokens';
+import { layout, shadow, space } from '@/theme/tokens';
 
 import { AppText } from './AppText';
 import { CalendarBlankIcon, ChartBarIcon, HouseIcon, UserIcon, type IconProps } from './icons';
@@ -74,8 +74,7 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    // 피그마 Shadow/Dock (0, -4, 8, #0000000A)
-    boxShadow: '0px -4px 8px rgba(0, 0, 0, 0.04)',
+    boxShadow: shadow.dock,
   },
   tab: {
     flex: 1,

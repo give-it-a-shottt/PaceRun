@@ -22,12 +22,12 @@ describe('폰 DB 스키마', () => {
     db = createDb();
   });
 
-  it('테이블 5개를 만든다', () => {
+  it('테이블 6개를 만든다', () => {
     const names = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
       .all()
       .map((row) => row.name);
-    expect(names).toEqual(['plan_items', 'run_points', 'run_segments', 'runs', 'settings']);
+    expect(names).toEqual(['active_run', 'plan_items', 'run_points', 'run_segments', 'runs', 'settings']);
   });
 
   it('러닝을 넣으면 기본값이 채워진다', () => {
@@ -80,6 +80,20 @@ describe('폰 DB 스키마', () => {
 
     expect(db.prepare('SELECT COUNT(*) AS n FROM run_points').get()).toEqual({ n: 0 });
     expect(db.prepare('SELECT COUNT(*) AS n FROM run_segments').get()).toEqual({ n: 0 });
+  });
+
+  it('진행 중인 러닝의 복구용 상태는 한 줄만 둘 수 있다', () => {
+    const insert = db.prepare("INSERT INTO active_run (id, state_json, saved_at) VALUES (?, '{}', 1000)");
+    insert.run(1);
+    expect(() => insert.run(2)).toThrow(/CHECK constraint/);
+    // 같은 줄을 덮어쓰는 것은 된다(러닝 중 1초마다 이렇게 저장한다)
+    db.prepare(
+      `INSERT INTO active_run (id, state_json, saved_at) VALUES (1, '{"a":1}', 2000)
+       ON CONFLICT (id) DO UPDATE SET state_json = excluded.state_json, saved_at = excluded.saved_at`,
+    ).run();
+    expect(db.prepare('SELECT state_json, saved_at FROM active_run').all()).toEqual([
+      { state_json: '{"a":1}', saved_at: 2000 },
+    ]);
   });
 
   it('계획은 요일(0~6)당 하나만 둘 수 있다', () => {

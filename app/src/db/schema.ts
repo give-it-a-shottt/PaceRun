@@ -57,4 +57,12 @@ export const MIGRATIONS: readonly string[] = [
     value TEXT NOT NULL
   );
   `,
+  // 2: 진행 중인 러닝의 계산 상태 한 벌(강제 종료 복구용). 줄은 항상 1개(id = 1)만 둔다.
+  `
+  CREATE TABLE active_run (
+    id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1),
+    state_json TEXT NOT NULL,
+    saved_at INTEGER NOT NULL
+  );
+  `,
 ];

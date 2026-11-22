@@ -7,8 +7,26 @@
  */
 export type { IconProps } from 'phosphor-react-native';
 
+export { BatteryWarningIcon } from 'phosphor-react-native/src/icons/BatteryWarning';
 export { CalendarBlankIcon } from 'phosphor-react-native/src/icons/CalendarBlank';
+export { CaretDownIcon } from 'phosphor-react-native/src/icons/CaretDown';
 export { CaretLeftIcon } from 'phosphor-react-native/src/icons/CaretLeft';
+export { CaretRightIcon } from 'phosphor-react-native/src/icons/CaretRight';
 export { ChartBarIcon } from 'phosphor-react-native/src/icons/ChartBar';
+export { CheckCircleIcon } from 'phosphor-react-native/src/icons/CheckCircle';
+export { GpsSlashIcon } from 'phosphor-react-native/src/icons/GpsSlash';
 export { HouseIcon } from 'phosphor-react-native/src/icons/House';
+export { InfoIcon } from 'phosphor-react-native/src/icons/Info';
+export { LightningIcon } from 'phosphor-react-native/src/icons/Lightning';
+export { LockSimpleIcon } from 'phosphor-react-native/src/icons/LockSimple';
+export { MetronomeIcon } from 'phosphor-react-native/src/icons/Metronome';
+export { MinusIcon } from 'phosphor-react-native/src/icons/Minus';
+export { PauseIcon } from 'phosphor-react-native/src/icons/Pause';
+export { PersonSimpleRunIcon } from 'phosphor-react-native/src/icons/PersonSimpleRun';
+export { PlayIcon } from 'phosphor-react-native/src/icons/Play';
+export { PlusIcon } from 'phosphor-react-native/src/icons/Plus';
+export { SpeakerHighIcon } from 'phosphor-react-native/src/icons/SpeakerHigh';
+export { StopIcon } from 'phosphor-react-native/src/icons/Stop';
+export { TimerIcon } from 'phosphor-react-native/src/icons/Timer';
 export { UserIcon } from 'phosphor-react-native/src/icons/User';
+export { WarningIcon } from 'phosphor-react-native/src/icons/Warning';

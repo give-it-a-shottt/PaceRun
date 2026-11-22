@@ -25,6 +25,17 @@ export function getDb(): Promise<SQLite.SQLiteDatabase> {
 async function open(): Promise<SQLite.SQLiteDatabase> {
   const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
+  try {
+    await applyMigrations(db);
+  } catch (error) {
+    // 실패한 채로 두면 '다시 시도' 때마다 연결이 하나씩 쌓인다
+    await db.closeAsync().catch(() => undefined);
+    throw error;
+  }
+  return db;
+}
+
+async function applyMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
   await runMigrations(
     {
       getVersion: async () => {
@@ -40,5 +51,4 @@ async function open(): Promise<SQLite.SQLiteDatabase> {
     },
     MIGRATIONS,
   );
-  return db;
 }

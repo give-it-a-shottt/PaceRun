@@ -18,11 +18,11 @@
 폴더
 - `app/src/app/` — expo-router 라우트 파일(화면). 화면은 서비스와 DB 쿼리를 부르기만 한다. 라우트가 아닌 코드는 이 폴더 밖에 둔다.
 - `app/src/domain/` — 순수 TypeScript 로직. React · Expo를 import하지 않는다(단위 테스트 대상).
-- `app/src/services/` — 기기 기능을 감싼 것: 위치 기록, 음성 · 메트로놈, 알림, 동기화.
+- `app/src/services/` — 기기 기능을 감싼 것: 위치 기록, 음성 · 메트로놈, 알림, 동기화. `runController`가 러닝 한 번의 진행(위치 · 타이머 → 계산 → 화면 상태 · DB · 음성)을 맡는다.
 - `app/src/db/` — expo-sqlite 스키마와 쿼리.
 - `app/src/state/` — 화면 여러 곳이 함께 보는 메모리 상태(zustand): 설정, 토스트. DB나 서비스를 불러 값을 채운다.
 - `app/plugins/` — 네이티브 빌드 설정을 덧붙이는 설정 플러그인(`android/`는 만들어지는 산출물이라 직접 고치지 않는다).
-- `app/src/theme/` · `app/src/components/` — 디자인 토큰과 공용 컴포넌트.
+- `app/src/theme/` · `app/src/components/` — 디자인 토큰과 공용 컴포넌트. 한 기능에서만 쓰는 화면 부품은 `components/run/`처럼 기능 폴더에 둔다.
 - `server/app/routers/` → `server/app/services/` → `server/app/models/` — 의존은 이 방향으로만 흐른다. 라우터에는 요청 · 응답 변환만 둔다.
 - `web/src/pages/` · `web/src/api/` · `web/src/components/`.
 
@@ -35,5 +35,6 @@
 1. 위치 서비스가 화면이 꺼져도 위치를 받는다(포그라운드 서비스).
 2. 위치가 올 때와 1초 타이머가 울릴 때, "지금 시각"을 넣어 domain의 계산 함수를 부른다.
 3. 계산 결과(경과 시간 · 거리 · 지금 구간 · 내보낼 안내)를 화면 상태와 SQLite에 반영하고, 안내는 음성으로 말한다.
+4. 화면은 계산 상태와 "지금 시각"만 받아 `domain/runView`로 글자를 만들어 그린다. 화면에 계산 로직을 두지 않는다.
 
 최종 수정: 2026-11-22 · 관련: D-001, D-003, D-004, D-005

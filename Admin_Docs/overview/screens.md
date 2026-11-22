@@ -28,16 +28,19 @@
 | MY_01_002 | `/my/sync` | my/sync.tsx | 페이지 |
 | MY_01_003 | `/my/login` | my/login.tsx | 페이지 |
 | MY_01_004 | `/my/signup` | my/signup.tsx | 페이지 |
-| RUN_01_002 · 003 · 005 · RUN_02_006 | `/run/active` | run/active.tsx | 전체 화면(탭 없음). 러닝 중 · 일시정지 · 주머니 모드 · GPS 끊김은 한 화면의 상태 |
+| — | `/run/countdown` | run/countdown.tsx | 전체 화면. 3초 카운트다운 뒤 러닝을 시작한다. 파라미터 `config`(JSON) · `planLabel` |
+| RUN_01_002 · 003 · RUN_02_006 | `/run/active` | run/active.tsx | 전체 화면(탭 없음). 러닝 중 · 일시정지 · GPS 끊김은 한 화면의 상태 |
+| RUN_01_005 | (라우트 없음) | src/components/run/PocketMode.tsx | 주머니 모드. 부품만 있고 아직 연결하지 않았다(Q-003) |
 | RUN_01_004 | `/run/summary/[id]` | run/summary/[id].tsx | 페이지(탭 없음) |
-| RUN_02_001 | (라우트 없음) | 토스트 | 시작 전 설정 시트에서 띄움 |
-| RUN_02_002 · 003 · 004 | (라우트 없음) | 알림 창(Alert) | 권한 없음 · 강제 종료 복구 · 10분 전 종료 |
+| RUN_02_001 | (라우트 없음) | src/components/run/GpsNotice.tsx | 시작 전 설정 시트 위(또는 홈의 버튼 위)에 띄우는 안내 + [그냥 시작하기] |
+| RUN_02_002 · 003 · 004 | (라우트 없음) | 알림 창(AlertDialog) | 권한 없음(run/LocationAlert) · 강제 종료 복구(홈) · 10분 전 종료(run/active) |
 
 이동 규칙
-- [시작] → 시작 전 설정 시트 → 3초 카운트다운 → `/run/active`
-- [10분만 뛰기] → 3초 카운트다운 → `/run/active`(자유 10분)
+- [시작] → 시작 전 설정 시트 → (위치 권한 · GPS 확인) → `/run/countdown` → `/run/active`
+- [10분만 뛰기] → (위치 권한 · GPS 확인) → `/run/countdown` → `/run/active`(자유 10분)
+- 러닝 화면들은 홈 위에 쌓지 않고 바꿔 넣는다(`router.replace`). 끝나고 홈으로 돌아올 때 홈이 겹쳐 쌓이지 않게 하려는 것.
 - 종료 → 10분 전이면 확인 창 → `/run/summary/[id]` → [확인] → `/home`
-- 앱을 켰을 때 끝나지 않은 러닝이 있으면 홈에서 복구 창(RUN_02_003)을 띄운다.
+- 홈이 보일 때마다 끝나지 않은 러닝이 있는지 본다. 방금까지 기록되고 있었으면 `/run/active`로 보내고, 끊겨 있었으면 복구 창(RUN_02_003)을 띄운다.
 
 ### 웹 (react-router, `web/src/pages/`)
 

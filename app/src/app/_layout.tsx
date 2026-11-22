@@ -8,6 +8,8 @@ import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Screen } from '@/components/Screen';
 import { ToastHost } from '@/components/Toast';
+// 화면이 뜨기 전에 백그라운드 위치 작업이 등록돼 있어야 한다(import만으로 등록된다)
+import '@/services/runLocation';
 import { SETTINGS_LOAD_ERROR, useSettingsStore } from '@/state/settingsStore';
 import { ThemeProvider } from '@/theme/ThemeContext';
 import { space } from '@/theme/tokens';
