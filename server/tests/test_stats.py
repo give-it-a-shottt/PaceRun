@@ -174,3 +174,93 @@ class TestValidation:
 
     def test_로그인하지_않으면_401(self, client: TestClient):
         assert client.get(STATS).status_code == 401
+
+
+class TestBoundaries:
+    """날짜 경계: 월말 · 연말 · 윤년 · 해를 걸치는 주 · 서머타임."""
+
+    def test_12월은_다음_해_1월_1일_전까지다(self, client: TestClient, headers: dict):
+        upload(client, headers, seoul(2026, 12, 31, 23))
+        upload(client, headers, seoul(2027, 1, 1, 0))  # 다음 해 기록은 빠진다
+
+        body = client.get(STATS, params={"period": "month", "anchor": "2026-12-10"}, headers=headers).json()
+
+        assert (body["start"], body["end"]) == ("2026-12-01", "2027-01-01")
+        assert len(body["buckets"]) == 31
+        assert body["buckets"][30]["count"] == 1
+        assert body["totals"]["count"] == 1
+
+    def test_윤년_2월은_29일까지_평년은_28일까지다(self, client: TestClient, headers: dict):
+        upload(client, headers, seoul(2028, 2, 29))
+
+        leap = client.get(STATS, params={"period": "month", "anchor": "2028-02-10"}, headers=headers).json()
+        plain = client.get(STATS, params={"period": "month", "anchor": "2027-02-10"}, headers=headers).json()
+
+        assert len(leap["buckets"]) == 29
+        assert leap["buckets"][28] == {
+            "label": "29",
+            "start": "2028-02-29",
+            "distance_m": 3000.0,
+            "count": 1,
+            "elapsed_s": 1200,
+        }
+        assert leap["end"] == "2028-03-01"
+        assert len(plain["buckets"]) == 28
+
+    def test_월말_밤_기록은_그_달에_다음_날_0시_기록은_다음_달에_들어간다(self, client: TestClient, headers: dict):
+        upload(client, headers, datetime(2026, 1, 31, 23, 30, tzinfo=SEOUL))
+        upload(client, headers, datetime(2026, 2, 1, 0, 0, tzinfo=SEOUL))
+
+        january = client.get(STATS, params={"period": "month", "anchor": "2026-01-15"}, headers=headers).json()
+        february = client.get(STATS, params={"period": "month", "anchor": "2026-02-15"}, headers=headers).json()
+
+        assert january["totals"]["count"] == 1 and january["buckets"][30]["count"] == 1
+        assert february["totals"]["count"] == 1 and february["buckets"][0]["count"] == 1
+
+    def test_해를_걸치는_주는_그_주_전체로_달성_여부를_본다(self, client: TestClient, headers: dict):
+        # 2025-12-29(월) ~ 2026-01-04(일): 12월에 2번, 1월에 1번 → 주 목표 3번 달성
+        for started in (seoul(2025, 12, 29), seoul(2025, 12, 31), seoul(2026, 1, 2)):
+            upload(client, headers, started)
+
+        january = client.get(STATS, params={"period": "month", "anchor": "2026-01-15"}, headers=headers).json()
+        december = client.get(STATS, params={"period": "month", "anchor": "2025-12-15"}, headers=headers).json()
+        year_2026 = client.get(STATS, params={"period": "year", "anchor": "2026-06-01"}, headers=headers).json()
+
+        # 1월 통계의 횟수는 1번뿐이지만, 걸친 주는 달성한 주로 센다
+        assert january["totals"]["count"] == 1
+        assert january["goal_weeks"]["achieved"] == 1
+        assert december["goal_weeks"]["achieved"] == 1
+        assert year_2026["goal_weeks"]["achieved"] == 1
+
+    def test_서머타임이_끝나_하루가_25시간인_날도_그날로_묶는다(self, client: TestClient, headers: dict):
+        new_york = ZoneInfo("America/New_York")
+        # 2026-11-01은 뉴욕에서 서머타임이 끝나는 날이다(새벽 2시가 두 번 온다)
+        upload(client, headers, datetime(2026, 11, 1, 0, 30, tzinfo=new_york))
+        upload(client, headers, datetime(2026, 11, 1, 23, 30, tzinfo=new_york))
+        upload(client, headers, datetime(2026, 11, 2, 0, 30, tzinfo=new_york))
+
+        body = client.get(
+            STATS, params={"period": "month", "anchor": "2026-11-15", "tz": "America/New_York"}, headers=headers
+        ).json()
+
+        assert body["buckets"][0]["count"] == 2
+        assert body["buckets"][1]["count"] == 1
+
+
+class TestAnchorAndTimezone:
+    def test_볼_수_있는_범위_밖의_날짜는_500이_아니라_422다(self, client: TestClient, headers: dict):
+        for anchor in ("9999-12-31", "9999-01-01", "1999-12-31", "2101-01-01"):
+            for period in ("month", "year"):
+                response = client.get(STATS, params={"period": period, "anchor": anchor}, headers=headers)
+                assert response.status_code == 422, (anchor, period)
+                assert response.json()["detail"]["code"] == "VALIDATION"
+
+    def test_범위의_양_끝은_볼_수_있다(self, client: TestClient, headers: dict):
+        assert client.get(STATS, params={"anchor": "2000-01-01"}, headers=headers).status_code == 200
+        assert client.get(STATS, params={"period": "year", "anchor": "2100-12-31"}, headers=headers).status_code == 200
+
+    def test_시간대_이름이_아닌_값은_422다(self, client: TestClient, headers: dict):
+        # "Asia"는 시간대 자료 안의 폴더 이름이라, 걸러 내지 않으면 다른 종류의 오류(500)가 난다
+        for tz in ("Asia", "Seoul", "../etc/passwd", "", "Asia/Seoul; DROP TABLE runs"):
+            response = client.get(STATS, params={"tz": tz}, headers=headers)
+            assert response.status_code == 422, tz

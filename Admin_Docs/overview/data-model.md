@@ -59,13 +59,33 @@ settings 테이블의 키 (`app/src/domain/types.ts`의 `Settings`, 값은 JSON 
 - config(JSONB)는 모드별 목표값이고 칸 이름은 snake_case다(api-list.md "러닝"의 config 표).
 - 서버 시간은 timestamptz(UTC). 주 계산(월요일 0시 시작)은 요청의 시간대(tz)로 한다.
 
-### 폰 ↔ 서버 이름 대응
+### 폰 ↔ 서버 이름 대응 (앱이 올리고 내려받을 때 이 표대로 바꾼다)
 
-| 폰 | 서버 · API |
-|---|---|
-| elapsed_ms | elapsed_s (초, 정수로 반올림) |
-| run_points 여러 줄 | route 배열 |
-| run_segments 여러 줄 | segments 배열 |
-| started_at(밀리초) | started_at(ISO 8601 문자열) |
+| 폰 (SQLite) | 서버 · API | 바꾸는 방법 |
+|---|---|---|
+| runs.id | `{id}` (주소) | 그대로 |
+| mode | mode | 그대로 |
+| config_json | config | 칸 이름을 snake_case로(아래 표) |
+| plan_label | plan_label | 그대로(null 가능) |
+| started_at (밀리초) | started_at | ISO 8601(UTC, `Z`) |
+| ended_at (밀리초) | ended_at | ISO 8601. 폰에서는 끝나기 전까지 null이지만, 끝난 러닝만 올리므로 항상 있다 |
+| elapsed_ms | elapsed_s | 1000으로 나눠 **내림**. 반올림하면 599.5초가 600초가 되어 폰과 서버의 10분 인정이 어긋난다 |
+| distance_m | distance_m | 그대로 |
+| avg_pace_s_per_km | avg_pace_s_per_km | 그대로(null 가능) |
+| counted | (올리지 않음) | 서버가 elapsed_s ≥ 600으로 정한다. 내려받을 때는 응답의 counted를 쓴다 |
+| status · sync_state · updated_at | (올리지 않음) | 폰에서만 쓴다. 끝난(finished) 러닝만 올린다 |
+| run_points 여러 줄 (lat, lng, elapsed_ms) | route `[[lat, lng, elapsed_s], …]` | elapsed_ms ÷ 1000(소수 그대로). t · accuracy는 올리지 않는다 |
+| run_segments 여러 줄 (idx, kind, started_elapsed_ms, duration_ms, distance_m) | segments `[{idx, kind, started_elapsed_s, duration_s, distance_m}, …]` | 시간 두 칸을 1000으로 나눠 반올림 |
+
+config 칸 이름
+
+| mode | 폰 (camelCase) | 서버 (snake_case) |
+|---|---|---|
+| free | targetDurationSec | target_duration_sec |
+| interval | runSec · walkSec · repeats | run_sec · walk_sec · repeats |
+| cadence | spm · durationSec | spm · duration_sec |
+| pacemaker | targetPaceSecPerKm · distanceM | target_pace_s_per_km · distance_m |
+
+- 서버가 받는 값의 범위는 api-list.md "러닝"의 표에 있다. 폰에서 고를 수 있는 범위(`app/src/domain/runConfig.ts`)는 모두 그 안이다.
 
 최종 수정: 2026-11-22 · 관련: D-004, D-006, D-007

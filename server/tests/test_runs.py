@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -246,3 +247,84 @@ class TestCascade:
         db.commit()
 
         assert db.scalar(select(func.count()).select_from(Run)) == 0
+
+
+class TestConsistency:
+    def test_경과_시간이_끝_시각에서_시작_시각을_뺀_것보다_길면_422(self, client: TestClient, headers: dict):
+        """1분 뛴 기록에 elapsed_s만 크게 보내 10분 인정을 받는 것을 막는다."""
+        body = run_body(ended_at=(STARTED + timedelta(minutes=1)).isoformat(), elapsed_s=1200)
+
+        response = client.put(f"{RUNS}/{uuid.uuid4()}", json=body, headers=headers)
+
+        assert response.status_code == 422
+        assert "elapsed_s" in response.text
+
+    def test_일시정지가_있어_경과_시간이_더_짧은_것은_받는다(self, client: TestClient, headers: dict):
+        body = run_body(ended_at=(STARTED + timedelta(minutes=40)).isoformat(), elapsed_s=1200)
+        assert client.put(f"{RUNS}/{uuid.uuid4()}", json=body, headers=headers).status_code == 201
+
+    def test_아주_천천히_걸은_기록의_페이스도_받는다(self, client: TestClient, headers: dict):
+        # 20분에 0.1km = km당 12000초. 앱은 페이스에 상한을 두지 않는다.
+        body = run_body(distance_m=100.0, avg_pace_s_per_km=12000.0)
+        assert client.put(f"{RUNS}/{uuid.uuid4()}", json=body, headers=headers).status_code == 201
+
+    def test_NaN과_무한대는_받지_않는다(self, client: TestClient, headers: dict):
+        for bad in ("NaN", "Infinity"):
+            raw = json.dumps(run_body()).replace("3200.5", bad)
+            response = client.put(
+                f"{RUNS}/{uuid.uuid4()}", content=raw, headers={**headers, "Content-Type": "application/json"}
+            )
+            assert response.status_code == 422, bad
+
+    def test_목표값이_틀리면_어느_칸인지_문구에_담는다(self, client: TestClient, headers: dict):
+        response = client.put(f"{RUNS}/{uuid.uuid4()}", json=run_body(config={"run_sec": 60}), headers=headers)
+
+        assert response.status_code == 422
+        assert "config.walk_sec" in response.text and "config.repeats" in response.text
+
+    def test_로그인_확인_직후_회원이_지워졌으면_401(self, db: Session):
+        """user_id 외래키 위반을 500으로 내보내지 않는다."""
+        from app.errors import AppError
+        from app.models import User
+        from app.schemas.run import RunIn
+        from app.services import run_service
+
+        ghost = User(id=uuid.uuid4(), email="ghost@example.com", password_hash="x", weekly_goal=3)
+
+        with pytest.raises(AppError) as raised:
+            run_service.upsert_run(db, ghost, uuid.uuid4(), RunIn.model_validate(run_body()))
+
+        assert raised.value.status_code == 401
+
+
+class TestBodySizeLimit:
+    def test_너무_큰_요청은_본문을_읽기_전에_413으로_돌려보낸다(self, client: TestClient, headers: dict):
+        huge = "x" * (2 * 1024 * 1024 + 1)
+
+        response = client.put(
+            f"{RUNS}/{uuid.uuid4()}", content=huge, headers={**headers, "Content-Type": "application/json"}
+        )
+
+        assert response.status_code == 413
+        assert error_code(response) == "PAYLOAD_TOO_LARGE"
+
+    def test_로그인하지_않은_큰_요청도_413이다(self, client: TestClient):
+        """본문 읽기는 로그인 확인보다 먼저라서, 크기 상한이 없으면 누구나 큰 본문으로 서버 메모리를 쓰게 할 수 있다."""
+        huge = "x" * (2 * 1024 * 1024 + 1)
+        response = client.put(f"{RUNS}/{uuid.uuid4()}", content=huge, headers={"Content-Type": "application/json"})
+        assert response.status_code == 413
+
+    def test_413_응답에도_CORS_헤더가_붙는다(self, client: TestClient):
+        huge = "x" * (2 * 1024 * 1024 + 1)
+        response = client.put(
+            f"{RUNS}/{uuid.uuid4()}",
+            content=huge,
+            headers={"Content-Type": "application/json", "Origin": "http://localhost:5173"},
+        )
+        assert response.status_code == 413
+        assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+
+    def test_경로_20000점짜리_정상_요청은_상한_안이다(self, client: TestClient, headers: dict):
+        route = [[37.5 + i * 0.00001, 127.0 + i * 0.00001, i] for i in range(20_000)]
+        body = run_body(route=route, elapsed_s=20_000, ended_at=(STARTED + timedelta(seconds=20_000)).isoformat())
+        assert client.put(f"{RUNS}/{uuid.uuid4()}", json=body, headers=headers).status_code == 201

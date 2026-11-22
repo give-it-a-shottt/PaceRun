@@ -8,11 +8,13 @@ from datetime import datetime
 from fastapi import status
 from sqlalchemy import Boolean, func, literal_column, select, tuple_
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, defer
 
-from app.errors import AppError
+from app.errors import AppError, unauthorized
 from app.models import Run, User
-from app.schemas.run import COUNTED_MIN_ELAPSED_S, RunIn
+from app.models.run import COUNTED_MIN_ELAPSED_S
+from app.schemas.run import RunIn
 
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 100
@@ -53,13 +55,19 @@ def upsert_run(db: Session, user: User, run_id: uuid.UUID, data: RunIn) -> tuple
     ).returning(Run.id, literal_column("(runs.xmax = 0)", Boolean).label("inserted"))
     # xmax는 Postgres가 줄마다 적어 두는 숨은 칸이다. 0이면 방금 새로 넣은 줄, 아니면 고친 줄.
 
-    row = db.execute(statement).first()
+    try:
+        row = db.execute(statement).first()
+    except IntegrityError as error:
+        # 로그인 확인 직후 회원이 지워진 경우(user_id 외래키 위반). 로그인이 풀린 것과 같다.
+        db.rollback()
+        raise unauthorized() from error
     if row is None:
         db.rollback()
         raise AppError(status.HTTP_409_CONFLICT, "RUN_ID_CONFLICT", "이 기록 번호는 이미 쓰이고 있어요")
     db.commit()
 
-    run = db.get(Run, run_id, populate_existing=True)
+    # 응답은 요약뿐이라 큰 칸(경로 · 구간)은 다시 읽지 않는다
+    run = db.get(Run, run_id, populate_existing=True, options=[defer(Run.route), defer(Run.segments)])
     if run is None:  # 방금 저장한 줄이라 일어나지 않지만, None을 그대로 흘려보내지 않는다
         raise AppError(status.HTTP_500_INTERNAL_SERVER_ERROR, "INTERNAL", "기록을 저장하지 못했어요")
     return run, bool(row.inserted)
