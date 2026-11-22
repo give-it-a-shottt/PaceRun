@@ -7,6 +7,7 @@
  */
 export type { IconProps } from 'phosphor-react-native';
 
+export { ArrowsClockwiseIcon } from 'phosphor-react-native/src/icons/ArrowsClockwise';
 export { BatteryWarningIcon } from 'phosphor-react-native/src/icons/BatteryWarning';
 export { CalendarBlankIcon } from 'phosphor-react-native/src/icons/CalendarBlank';
 export { CaretDownIcon } from 'phosphor-react-native/src/icons/CaretDown';
