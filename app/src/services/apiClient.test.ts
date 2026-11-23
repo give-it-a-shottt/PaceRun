@@ -60,6 +60,26 @@ describe('요청 보내기', () => {
     expect(apiBaseUrl()).toBe('http://10.0.2.2:8000/api/v1');
   });
 
+  it('개발 빌드가 아니면 https 주소를 줬을 때만 보낸다(비밀번호 · 토큰을 암호화 없이 보내지 않는다)', async () => {
+    vi.stubEnv('EXPO_PUBLIC_API_URL', 'https://api.example.com');
+    expect(apiBaseUrl(false)).toBe('https://api.example.com/api/v1');
+
+    vi.stubEnv('EXPO_PUBLIC_API_URL', 'http://192.168.0.10:8000');
+    expect(apiBaseUrl(false)).toBeNull();
+    expect(apiBaseUrl(true)).toBe('http://192.168.0.10:8000/api/v1');
+
+    // 주소를 주지 않으면 개발용 기본 주소로 보내지 않는다
+    vi.stubEnv('EXPO_PUBLIC_API_URL', '');
+    expect(apiBaseUrl(false)).toBeNull();
+  });
+
+  it('보낼 주소가 없으면 요청하지 않고 NetworkError다', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('EXPO_PUBLIC_API_URL', '');
+    await expect(apiRequest('GET', '/runs')).rejects.toBeInstanceOf(NetworkError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('204는 본문 없이 성공이다', async () => {
     fetchMock.mockResolvedValue(respond(204));
     expect(await apiRequest('POST', '/auth/logout', { body: {} })).toBeUndefined();

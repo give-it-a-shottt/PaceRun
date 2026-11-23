@@ -160,6 +160,34 @@ function readListPage(payload: unknown): RunListPage {
   };
 }
 
+/**
+ * 러닝 한 건을 받아 폰에 넣는다. 서버가 그 기록을 주지 않거나(404 등 4xx), 모양이 틀리거나, 폰에 넣다 실패하면
+ * 그 기록만 건너뛴다. 서버에 닿지 못함 · 서버 오류(5xx) · 로그인 만료는 뒤의 기록도 같을 것이므로 던져서 멈춘다.
+ */
+async function downloadOne(id: string): Promise<void> {
+  let payload: unknown;
+  try {
+    payload = await authorizedRequest('GET', `/runs/${encodeURIComponent(id)}`);
+  } catch (error) {
+    if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
+      console.warn('[sync] 서버가 주지 않은 기록이 있어 건너뛰었어요', error.status, error.code);
+      return;
+    }
+    throw error;
+  }
+  const run = fromServerRun(payload);
+  if (!run) {
+    // 모양이 틀린 기록은 폰에 넣지 않는다
+    console.warn('[sync] 내려받은 기록의 모양이 달라 건너뛰었어요');
+    return;
+  }
+  try {
+    await insertDownloadedRun(run);
+  } catch (error) {
+    console.warn('[sync] 내려받은 기록을 폰에 넣지 못했어요', error instanceof Error ? error.name : 'unknown');
+  }
+}
+
 /** 서버에만 있는 러닝을 내려받아 폰에 넣는다(새 폰에서 로그인했을 때). 폰에 이미 있는 번호는 건드리지 않는다. */
 async function downloadMissing(): Promise<void> {
   const known = new Set(await listRunIds());
@@ -169,21 +197,18 @@ async function downloadMissing(): Promise<void> {
     const page: RunListPage = readListPage(await authorizedRequest('GET', `/runs?${query}`));
     for (const item of page.items) {
       if (known.has(item.id)) continue;
-      const run = fromServerRun(await authorizedRequest('GET', `/runs/${encodeURIComponent(item.id)}`));
-      if (!run) {
-        // 모양이 틀린 기록은 폰에 넣지 않는다
-        console.warn('[sync] 내려받은 기록의 모양이 달라 건너뛰었어요');
-        continue;
-      }
-      await insertDownloadedRun(run);
+      // 한 건을 받지 못했다고 뒤의 기록까지 못 받으면 안 된다. 그 기록만 건너뛴다(다음 [지금 동기화] 때 다시 받아 본다).
       known.add(item.id);
+      await downloadOne(item.id);
     }
     if (!page.nextCursor) return;
     cursor = page.nextCursor;
   }
 }
 
-// 로그아웃하면 기억해 둔 것을 지운다(다음에 로그인하는 계정은 다른 계정일 수 있다)
+// 로그아웃하면 기억해 둔 것을 지운다(다음에 로그인하는 계정은 다른 계정일 수 있다).
+// session.ts가 이 모듈을 부르면 서로를 import하게 되므로, 상태가 바뀌는 것을 여기서 지켜본다.
+// (루트 레이아웃이 이 모듈을 import하므로 앱이 켜져 있는 동안 늘 걸려 있다.)
 useAuthStore.subscribe((state, previous) => {
   if (state.status === 'signedOut' && previous.status !== 'signedOut') {
     rejectedIds.clear();

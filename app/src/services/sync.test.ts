@@ -284,6 +284,51 @@ describe('내려받기', () => {
     expect(useAuthStore.getState().syncProblem).toBeNull();
   });
 
+  it('서버가 한 건을 주지 않아도(404) 그 기록만 건너뛰고 나머지를 받는다', async () => {
+    respondWith({
+      'GET /runs': () => ({ items: [{ id: 'gone' }, { id: 'good' }], next_cursor: null }),
+      'GET /runs/:id': (path) => {
+        if (path.endsWith('/gone')) throw new ApiError(404, 'RUN_NOT_FOUND', '없음');
+        return serverRun('good');
+      },
+    });
+
+    await syncNow({ download: true });
+
+    expect(vi.mocked(insertDownloadedRun).mock.calls.map(([run]) => run.id)).toEqual(['good']);
+    // 끝까지 간 것으로 본다
+    expect(useAuthStore.getState().syncProblem).toBeNull();
+    expect(saveSetting).toHaveBeenCalledWith('lastSyncAt', expect.any(Number));
+  });
+
+  it('한 건을 폰에 넣지 못해도 나머지를 받는다', async () => {
+    respondWith({
+      'GET /runs': () => ({ items: [{ id: 'r1' }, { id: 'r2' }], next_cursor: null }),
+      'GET /runs/:id': (path) => serverRun(path.split('/').pop()!),
+    });
+    vi.mocked(insertDownloadedRun).mockRejectedValueOnce(new Error('disk')).mockResolvedValue(true);
+
+    await syncNow({ download: true });
+
+    expect(insertDownloadedRun).toHaveBeenCalledTimes(2);
+    expect(useAuthStore.getState().syncProblem).toBeNull();
+  });
+
+  it('내려받다가 서버 오류(500)나 연결 실패가 나면 거기서 멈춘다(뒤의 기록도 같을 것이다)', async () => {
+    respondWith({
+      'GET /runs': () => ({ items: [{ id: 'r1' }, { id: 'r2' }], next_cursor: null }),
+      'GET /runs/:id': () => {
+        throw new ApiError(500, 'INTERNAL', '서버 오류');
+      },
+    });
+
+    await syncNow({ download: true });
+
+    expect(request.mock.calls.filter(([method, path]) => method === 'GET' && path.startsWith('/runs/'))).toHaveLength(1);
+    expect(useAuthStore.getState().syncProblem).toBe('server');
+    expect(saveSetting).not.toHaveBeenCalled();
+  });
+
   it('목록의 모양이 틀리면 서버 문제로 알리고 멈춘다', async () => {
     respondWith({ 'GET /runs': () => ({ rows: [] }) });
     await syncNow({ download: true });

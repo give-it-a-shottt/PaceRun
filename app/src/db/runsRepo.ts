@@ -101,6 +101,22 @@ async function insertPoints(db: SQLiteDatabase, runId: string, points: readonly 
   }
 }
 
+/** 구간 기록을 넣는다. 같은 번호(idx)가 두 번 오면 나중 것이 남는다. */
+async function insertSegments(db: SQLiteDatabase, runId: string, segments: readonly RunSegment[]): Promise<void> {
+  for (const segment of segments) {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO run_segments (run_id, idx, kind, started_elapsed_ms, duration_ms, distance_m)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      runId,
+      segment.idx,
+      segment.kind,
+      Math.round(segment.startedElapsedMs),
+      Math.round(segment.durationMs),
+      segment.distanceM,
+    );
+  }
+}
+
 /**
  * 끝나지 않은 채 남은 러닝 가운데 복구용 상태(active_run)가 없는 것을 '끝남'으로 닫는다.
  * 시작 직후 첫 저장 전에 앱이 죽었거나, 시작에 실패한 러닝을 지우지 못했을 때 생긴다.
@@ -162,18 +178,7 @@ export async function saveFinishedRun(summary: RunSummary, points: readonly RunP
       summary.runId,
     );
     await txn.runAsync('DELETE FROM run_segments WHERE run_id = ?', summary.runId);
-    for (const segment of summary.segments) {
-      await txn.runAsync(
-        `INSERT INTO run_segments (run_id, idx, kind, started_elapsed_ms, duration_ms, distance_m)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        summary.runId,
-        segment.idx,
-        segment.kind,
-        Math.round(segment.startedElapsedMs),
-        Math.round(segment.durationMs),
-        segment.distanceM,
-      );
-    }
+    await insertSegments(txn, summary.runId, summary.segments);
     await txn.runAsync('DELETE FROM active_run WHERE id = 1');
   });
 }
@@ -311,18 +316,7 @@ export async function insertDownloadedRun(run: DownloadedRun): Promise<boolean> 
     );
     if (inserted.changes === 0) return false;
     await insertPoints(db, run.id, run.points);
-    for (const segment of run.segments) {
-      await db.runAsync(
-        `INSERT OR REPLACE INTO run_segments (run_id, idx, kind, started_elapsed_ms, duration_ms, distance_m)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        run.id,
-        segment.idx,
-        segment.kind,
-        Math.round(segment.startedElapsedMs),
-        Math.round(segment.durationMs),
-        segment.distanceM,
-      );
-    }
+    await insertSegments(db, run.id, run.segments);
     return true;
   });
 }

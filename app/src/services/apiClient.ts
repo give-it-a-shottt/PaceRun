@@ -1,15 +1,23 @@
 /** 서버 API에 요청을 보내는 가장 아래 층. 주소 · 에러 형식 · 시간 제한만 다룬다(토큰은 session.ts가 붙인다). */
 
+import { isRecord } from '@/domain/guards';
+
 /** 개발 중 에뮬레이터에서 내 PC의 서버를 가리키는 주소. 실기기 · 운영에서는 EXPO_PUBLIC_API_URL로 바꾼다. */
 const DEFAULT_API_ORIGIN = 'http://10.0.2.2:8000';
 const API_PREFIX = '/api/v1';
 /** 이 시간 안에 답이 없으면 서버에 닿지 못한 것으로 본다 */
 const DEFAULT_TIMEOUT_MS = 15_000;
 
-export function apiBaseUrl(): string {
-  // 비어 있는 값(.env에 이름만 적어 둔 경우)도 기본 주소로 본다
-  const origin = (process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_ORIGIN).replace(/\/+$/, '');
-  return origin + API_PREFIX;
+/**
+ * 요청을 보낼 주소. 보낼 수 없으면 null:
+ * 개발 빌드가 아닌데(스토어에 올리는 빌드) 주소를 주지 않았거나 주소가 https가 아닐 때 —
+ * 비밀번호와 토큰을 암호화 없이 보내거나, 개발용 기본 주소로 보내는 일을 막는다.
+ */
+export function apiBaseUrl(isDevBuild: boolean = process.env.NODE_ENV !== 'production'): string | null {
+  // 비어 있는 값(.env에 이름만 적어 둔 경우)도 주지 않은 것으로 본다
+  const configured = (process.env.EXPO_PUBLIC_API_URL || '').replace(/\/+$/, '');
+  if (!isDevBuild) return configured.startsWith('https://') ? configured + API_PREFIX : null;
+  return (configured || DEFAULT_API_ORIGIN) + API_PREFIX;
 }
 
 export type FieldError = { field: string; message: string };
@@ -41,18 +49,14 @@ type RequestOptions = {
   timeoutMs?: number;
 };
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
 /** 에러 응답의 본문에서 코드 · 문구 · 칸별 오류를 꺼낸다. 형식이 다르면(프록시의 HTML 등) 상태 코드만으로 만든다. */
 function toApiError(status: number, payload: unknown): ApiError {
-  const detail = isObject(payload) && isObject(payload.detail) ? payload.detail : null;
+  const detail = isRecord(payload) && isRecord(payload.detail) ? payload.detail : null;
   const code = typeof detail?.code === 'string' ? detail.code : 'HTTP_ERROR';
   const message = typeof detail?.message === 'string' ? detail.message : '요청을 처리하지 못했어요';
   const fields = Array.isArray(detail?.fields)
     ? detail.fields.flatMap((item): FieldError[] =>
-        isObject(item) && typeof item.message === 'string'
+        isRecord(item) && typeof item.message === 'string'
           ? [{ field: typeof item.field === 'string' ? item.field : '', message: item.message }]
           : [],
       )
@@ -65,12 +69,14 @@ function toApiError(status: number, payload: unknown): ApiError {
  * 서버가 거절하면 ApiError, 서버에 닿지 못하면 NetworkError를 던진다.
  */
 export async function apiRequest<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
+  const baseUrl = apiBaseUrl();
+  if (!baseUrl) throw new NetworkError('서버 주소가 설정되지 않았어요');
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
 
   let response: Response;
   try {
-    response = await fetch(apiBaseUrl() + path, {
+    response = await fetch(baseUrl + path, {
       method,
       headers: {
         Accept: 'application/json',

@@ -137,9 +137,20 @@ describe('서버 상한에 맞추기 (Q-006 임시 처리)', () => {
     expect(toRunUpload(run({ endedAt: null }), [], [])).toEqual({ kind: 'skip', reason: 'unfinished' });
   });
 
-  it('끝 시각이 시작보다 빠르게 적힌 기록은 시작 시각으로 맞춘다(서버가 422로 막지 않게)', () => {
-    const body = upload(run({ endedAt: STARTED_AT - 5000, elapsedMs: 0 }), [], []);
-    expect(body.ended_at).toBe(body.started_at);
+  it('끝 시각이 "시작 + 경과 시간"보다 빠르게 적힌 기록은 끝 시각을 맞춘다(서버는 경과 시간이 끝 − 시작보다 길면 받지 않는다)', () => {
+    // 뛰는 도중 폰의 시계가 뒤로 맞춰진 경우: 20분을 뛰었는데 끝 시각이 시작보다 5초 빠르게 적혔다
+    const body = upload(run({ endedAt: STARTED_AT - 5000, elapsedMs: 20 * 60_000 }), [], []);
+    expect(body.elapsed_s).toBe(1200);
+    expect(Date.parse(body.ended_at) - Date.parse(body.started_at)).toBe(1200_000);
+
+    // 경과 시간이 0이면 시작 시각과 같게 맞춘다
+    const empty = upload(run({ endedAt: STARTED_AT - 5000, elapsedMs: 0 }), [], []);
+    expect(empty.ended_at).toBe(empty.started_at);
+  });
+
+  it('일시정지가 있어 끝 − 시작이 경과 시간보다 긴 기록의 끝 시각은 그대로 둔다', () => {
+    const body = upload(run({ endedAt: STARTED_AT + 40 * 60_000, elapsedMs: 20 * 60_000 }), [], []);
+    expect(Date.parse(body.ended_at)).toBe(STARTED_AT + 40 * 60_000);
   });
 
   it('구간 번호는 0부터 차례로 다시 매긴다', () => {
@@ -230,6 +241,16 @@ describe('내려받은 러닝 바꾸기', () => {
       { ...detail, route: [[37.5, 'x', 0]] },
     ];
     for (const value of broken) expect(fromServerRun(value)).toBeNull();
+  });
+
+  it('서버가 받는 크기를 넘는 응답은 받지 않는다(폰 DB에 끝없이 넣지 않는다)', () => {
+    const point = [37.5, 127, 0];
+    const segment = { idx: 0, kind: 'km', started_elapsed_s: 0, duration_s: 1, distance_m: 1 };
+    expect(fromServerRun({ ...detail, route: Array.from({ length: SERVER_LIMITS.routePoints + 1 }, () => point) })).toBeNull();
+    expect(fromServerRun({ ...detail, segments: Array.from({ length: SERVER_LIMITS.segments + 1 }, () => segment) })).toBeNull();
+    expect(fromServerRun({ ...detail, plan_label: '가'.repeat(SERVER_LIMITS.planLabel + 1) })).toBeNull();
+    // 상한에 딱 맞는 것은 받는다
+    expect(fromServerRun({ ...detail, plan_label: '가'.repeat(SERVER_LIMITS.planLabel) })?.planLabel).toHaveLength(50);
   });
 
   it('모드마다 목표값을 폰의 모양으로 바꾼다', () => {

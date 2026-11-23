@@ -25,6 +25,11 @@ export class SessionExpiredError extends Error {
 }
 
 let accessToken: { value: string; expiresAt: number } | null = null;
+/**
+ * 로그인 "판" 번호. 로그인 · 로그아웃할 때마다 올린다. 서버에 다녀오는 사이에 번호가 바뀌었으면
+ * (그 사이 로그아웃했거나 다른 계정으로 로그인했으면) 늦게 온 결과로 토큰을 저장하거나 상태를 바꾸지 않는다.
+ */
+let sessionEpoch = 0;
 /** 갱신은 한 번에 하나만. 리프레시 토큰은 한 번 쓰면 바뀌므로 겹쳐 보내면 한쪽이 401이 된다. */
 let refreshing: Promise<string> | null = null;
 
@@ -52,9 +57,16 @@ export async function restoreSession(): Promise<void> {
 
 async function startSession(auth: AuthOut): Promise<void> {
   if (!auth.refresh_token) throw new ApiError(200, 'BAD_RESPONSE', '서버의 응답을 읽지 못했어요');
-  // 리프레시 토큰을 먼저 저장한다. 저장에 실패하면 로그인된 것으로 치지 않는다(다음에 켰을 때 로그인이 풀려 있게 된다).
+  sessionEpoch += 1;
+  // 리프레시 토큰을 먼저 저장한다. 저장에 실패하면 로그인된 것으로 치지 않는다.
   await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, auth.refresh_token);
-  await SecureStore.setItemAsync(EMAIL_KEY, auth.user.email);
+  try {
+    await SecureStore.setItemAsync(EMAIL_KEY, auth.user.email);
+  } catch (error) {
+    // 화면에는 실패로 알리는데 토큰만 남으면, 다음에 켰을 때 이메일 없는 로그인 상태가 된다. 넣은 토큰을 도로 지운다.
+    await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY).catch(() => undefined);
+    throw error;
+  }
   keepAccessToken(auth);
   useAuthStore.setState({ status: 'signedIn', email: auth.user.email, syncProblem: null });
 }
@@ -74,6 +86,8 @@ export async function logIn(email: string, password: string): Promise<void> {
  * 서버에 닿지 못해도 폰에서는 로그아웃된다(토큰은 30일 뒤 스스로 만료된다).
  */
 export async function logOut(): Promise<void> {
+  // 지금 돌고 있는 토큰 갱신이 끝나도 그 결과를 쓰지 않게 판 번호부터 올린다
+  sessionEpoch += 1;
   const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY).catch(() => null);
   accessToken = null;
   await Promise.all([
@@ -86,17 +100,22 @@ export async function logOut(): Promise<void> {
   }
 }
 
-/** 만료로 바꾼다: 쓸 수 없는 토큰을 지우고, 이메일은 남겨 다시 로그인 화면에 채워 준다. */
-async function expireSession(): Promise<void> {
+/**
+ * 만료로 바꾼다: 쓸 수 없는 토큰을 지우고, 이메일은 남겨 다시 로그인 화면에 채워 준다.
+ * 요청을 보낸 뒤로 로그인 판이 바뀌었으면(로그아웃 · 다시 로그인) 아무것도 하지 않는다.
+ */
+async function expireSession(epoch: number): Promise<void> {
+  if (epoch !== sessionEpoch) return;
   accessToken = null;
   await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY).catch(() => undefined);
-  useAuthStore.setState({ status: 'expired' });
+  if (epoch === sessionEpoch) useAuthStore.setState({ status: 'expired' });
 }
 
 async function refreshAccessToken(): Promise<string> {
+  const epoch = sessionEpoch;
   const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
   if (!refreshToken) {
-    await expireSession();
+    await expireSession(epoch);
     throw new SessionExpiredError();
   }
   let tokens: TokenOut;
@@ -105,12 +124,18 @@ async function refreshAccessToken(): Promise<string> {
   } catch (error) {
     // 서버가 토큰을 받지 않았을 때만 만료다. 서버에 닿지 못한 것(NetworkError)은 로그인을 풀 이유가 아니다.
     if (error instanceof ApiError && error.status === 401) {
-      await expireSession();
+      await expireSession(epoch);
       throw new SessionExpiredError();
     }
     throw error;
   }
   if (!tokens.refresh_token) throw new ApiError(200, 'BAD_RESPONSE', '서버의 응답을 읽지 못했어요');
+  if (epoch !== sessionEpoch) {
+    // 서버에 다녀오는 사이에 로그아웃했다. 새로 받은 토큰을 저장하면 로그아웃한 폰에 로그인이 되살아난다.
+    // 저장하지 않고, 서버에 남은 새 토큰도 폐기를 알린다(닿지 못하면 30일 뒤 스스로 만료된다).
+    await apiRequest<void>('POST', '/auth/logout', { body: { refresh_token: tokens.refresh_token } }).catch(() => undefined);
+    throw new SessionExpiredError();
+  }
   // 쓴 토큰은 서버에서 이미 바뀌었다. 새 토큰을 저장하지 못하면 다음 갱신 때 만료로 드러난다.
   await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refresh_token);
   return keepAccessToken(tokens);
@@ -141,12 +166,13 @@ export async function authorizedRequest<T>(method: string, path: string, body?: 
     if (!(error instanceof ApiError && error.status === 401)) throw error;
   }
   // 서버 시계와 어긋나 토큰이 먼저 만료된 경우. 새로 받아 한 번만 다시 보낸다.
+  const epoch = sessionEpoch;
   const retried = await freshAccessToken(true);
   try {
     return await apiRequest<T>(method, path, { body, accessToken: retried });
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
-      await expireSession();
+      await expireSession(epoch);
       throw new SessionExpiredError();
     }
     throw error;

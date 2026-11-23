@@ -2,6 +2,7 @@
  * 폰의 러닝 ↔ 서버 API의 러닝을 서로 바꾼다(overview/data-model.md "폰 ↔ 서버 이름 대응").
  * 올릴 때는 서버가 받는 범위에 맞추고(Q-006), 내려받은 값은 모양을 확인한 뒤에만 쓴다.
  */
+import { isFiniteNumber, isRecord } from './guards';
 import type { RunPoint, RunSegment, SegmentKind } from './runEngine';
 import { isRunConfig } from './settings';
 import { COUNTED_MIN_ELAPSED_MS, RUN_MODES, type RunConfig, type RunMode } from './types';
@@ -124,8 +125,9 @@ export function toRunUpload(
       config: configToServer(run.config),
       plan_label: run.planLabel == null ? null : run.planLabel.replaceAll('\u0000', '').slice(0, SERVER_LIMITS.planLabel),
       started_at: new Date(run.startedAt).toISOString(),
-      // 시계가 뒤로 맞춰져 끝 시각이 시작보다 빠르게 적힌 기록도 서버가 받게 한다
-      ended_at: new Date(Math.max(run.endedAt, run.startedAt)).toISOString(),
+      // 서버는 "경과 시간 ≤ 끝 − 시작 + 5초"가 아니면 받지 않는다. 뛰는 도중 폰의 시계가 뒤로 맞춰지면
+      // 끝 시각이 그보다 빠르게 적힐 수 있어서, 그런 기록은 끝 시각을 "시작 + 경과 시간"으로 맞춰 올린다.
+      ended_at: new Date(Math.max(run.endedAt, run.startedAt + elapsedS * 1000)).toISOString(),
       elapsed_s: elapsedS,
       distance_m: Math.max(0, run.distanceM),
       avg_pace_s_per_km: pace != null && pace > 0 && pace <= SERVER_LIMITS.paceSecPerKm ? pace : null,
@@ -163,17 +165,9 @@ export type DownloadedRun = {
   points: RunPoint[];
 };
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
-}
-
 /** 서버의 config(snake_case) → 폰의 목표값. 모르는 모양이면 null */
 export function configFromServer(mode: RunMode, config: unknown): RunConfig | null {
-  if (!isObject(config)) return null;
+  if (!isRecord(config)) return null;
   let candidate: unknown;
   switch (mode) {
     case 'free':
@@ -195,7 +189,7 @@ export function configFromServer(mode: RunMode, config: unknown): RunConfig | nu
 const SEGMENT_KINDS: readonly SegmentKind[] = ['run', 'walk', 'km'];
 
 function segmentFromServer(value: unknown): RunSegment | null {
-  if (!isObject(value)) return null;
+  if (!isRecord(value)) return null;
   const { idx, kind, started_elapsed_s: startedS, duration_s: durationS, distance_m: distanceM } = value;
   if (!isFiniteNumber(idx) || !SEGMENT_KINDS.includes(kind as SegmentKind)) return null;
   if (!isFiniteNumber(startedS) || !isFiniteNumber(durationS) || !isFiniteNumber(distanceM)) return null;
@@ -213,13 +207,13 @@ function segmentFromServer(value: unknown): RunSegment | null {
  * 모양이 틀리면 null(그 기록은 건너뛴다 — 틀린 값을 폰 DB에 넣지 않는다).
  */
 export function fromServerRun(value: unknown): DownloadedRun | null {
-  if (!isObject(value)) return null;
+  if (!isRecord(value)) return null;
   const { id, mode, plan_label: planLabel, elapsed_s: elapsedS, distance_m: distanceM, avg_pace_s_per_km: pace } = value;
   if (typeof id !== 'string' || id.length === 0) return null;
   if (!RUN_MODES.includes(mode as RunMode)) return null;
   const config = configFromServer(mode as RunMode, value.config);
   if (!config) return null;
-  if (planLabel != null && typeof planLabel !== 'string') return null;
+  if (planLabel != null && (typeof planLabel !== 'string' || planLabel.length > SERVER_LIMITS.planLabel)) return null;
 
   const startedAt = typeof value.started_at === 'string' ? Date.parse(value.started_at) : NaN;
   const endedAt = typeof value.ended_at === 'string' ? Date.parse(value.ended_at) : NaN;
@@ -228,6 +222,8 @@ export function fromServerRun(value: unknown): DownloadedRun | null {
   if (pace != null && !(isFiniteNumber(pace) && pace > 0)) return null;
 
   if (!Array.isArray(value.segments) || !Array.isArray(value.route)) return null;
+  // 서버가 받는 크기를 넘는 응답은 우리 서버의 것이 아니다. 폰 DB에 끝없이 넣지 않는다.
+  if (value.segments.length > SERVER_LIMITS.segments || value.route.length > SERVER_LIMITS.routePoints) return null;
   const segments: RunSegment[] = [];
   for (const item of value.segments) {
     const segment = segmentFromServer(item);
