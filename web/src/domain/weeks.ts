@@ -1,4 +1,5 @@
 /** "주 목표 달성" 카드에 그릴 값: 최근 8주의 달성 여부와 연속 주 수. 한 주는 월요일 0시에 시작한다(앱과 같은 기준). */
+import { formatMonthDay } from './format';
 import type { RunSummary } from './types';
 
 const DAYS_PER_WEEK = 7;
@@ -45,11 +46,6 @@ export type GoalWeeksView = {
   caption: string;
 };
 
-function mondayLabel(weekStart: number): string {
-  const date = new Date(weekStart);
-  return `${date.getMonth() + 1}월 ${date.getDate()}일`;
-}
-
 /**
  * 러닝 목록에서 주마다 인정된(10분 이상) 러닝 수를 세어 목표와 견준다.
  * 연속 주 수: 지난주부터 거슬러 올라가며 목표를 채운 주를 세고, 이번 주도 채웠으면 더한다
@@ -83,7 +79,7 @@ export function describeGoalWeeks(
   const cells: WeekCell[] = [];
   for (let back = SHOWN_WEEKS - 1; back >= 0; back--) {
     const week = shiftWeeks(thisWeek, -back);
-    const label = mondayLabel(week);
+    const label = formatMonthDay(week);
     cells.push({ label, title: `${label} 주 · ${countOf(week)}회`, count: countOf(week), met: met(week), isCurrent: back === 0 });
   }
 

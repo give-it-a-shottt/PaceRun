@@ -5,6 +5,7 @@ import { Card } from '../../components/Card';
 import { Skeleton } from '../../components/LoadState';
 import { LoadedRunsTable } from '../../components/RunsTable';
 import { toDateText } from '../../domain/dashboard';
+import { cardStateOf } from './cardState';
 import { ChartCard } from './ChartCard';
 import { MetricToggle, PeriodStepper, PeriodTabs } from './DashboardControls';
 import { parseDashboardQuery } from './dashboardQuery';
@@ -47,7 +48,7 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <Card labelledBy={recentTitleId} busy={data.recentRuns.data === undefined && !data.recentRuns.failed} flush>
+      <Card labelledBy={recentTitleId} busy={cardStateOf(data.recentRuns).status === 'loading'} flush>
         <h2 id={recentTitleId} className={styles.recentTitle}>
           최근 러닝
         </h2>

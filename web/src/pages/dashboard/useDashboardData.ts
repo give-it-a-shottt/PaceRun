@@ -24,7 +24,7 @@ export type DashboardData = {
 };
 
 /**
- * 대시보드가 읽는 조회 4개(이 기간의 통계 · 바로 앞 기간의 통계 · 최근 26주의 러닝 · 최근 러닝 5개)를 부르고
+ * 대시보드가 읽는 조회 4개(이 기간의 통계 · 바로 앞 기간의 통계 · 연속 주를 세는 데 쓰는 최근 러닝(기간은 domain/weeks의 STREAK_LOOKBACK_WEEKS) · 최근 러닝 5개)를 부르고
  * 카드마다 그릴 상태로 정리한다. now는 화면을 연 시각, today는 그 날짜("YYYY-MM-DD").
  */
 export function useDashboardData({ period, anchor, metric }: DashboardQuery, today: string, now: number): DashboardData {

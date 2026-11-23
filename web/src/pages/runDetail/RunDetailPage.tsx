@@ -1,11 +1,12 @@
 import { CaretRightIcon } from '@phosphor-icons/react';
 import { skipToken, useQuery } from '@tanstack/react-query';
-import { Suspense, useId } from 'react';
+import { Suspense, useId, useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
+import { isNotFound } from '../../api/client';
 import { fetchPreviousComparable, fetchRun } from '../../api/runs';
 import { createLazyPart } from '../../app/lazyPart';
-import { hasFailed, isNotFound } from '../../app/queryClient';
+import { hasFailed } from '../../app/queryClient';
 import { Card } from '../../components/Card';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { EmptyText, LoadError, LoadingText, Skeleton } from '../../components/LoadState';
@@ -162,8 +163,11 @@ export function RunDetailPage() {
     queryKey: ['run', id, 'previous'],
     queryFn: run ? () => fetchPreviousComparable(run) : skipToken,
   });
+  const previous = previousQuery.isSuccess ? previousQuery.data : 'loading';
+  // 다시 그릴 때마다 경로 배열을 새로 만들지 않는다(지도가 범위와 선을 다시 계산한다).
+  const view = useMemo(() => (run ? describeRunDetail(run, previous) : null), [run, previous]);
 
-  if (!run) {
+  if (!run || !view) {
     if (isNotFound(runQuery.error)) {
       return (
         <>
@@ -193,7 +197,6 @@ export function RunDetailPage() {
     );
   }
 
-  const view = describeRunDetail(run, previousQuery.isSuccess ? previousQuery.data : 'loading');
   return (
     <>
       <Breadcrumb current={view.breadcrumb} />

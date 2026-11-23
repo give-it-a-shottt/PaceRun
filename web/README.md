@@ -24,8 +24,8 @@ npm run build
 ## 폴더
 
 - `src/domain/` — 화면에 그릴 값을 만드는 순수 함수(대시보드 · 주 목표 · 러닝 목록과 상세 · 로그인 입력 확인)
-- `src/api/` — 서버 통신: `client`(요청 한 건) → `session`(로그인 상태 · 토큰) → `runs`(조회)
-- `src/app/` — 라우트 지키기 · 조회 설정
-- `src/pages/` · `src/components/` · `src/styles/` — 화면
+- `src/api/` — 서버 통신: `client`(요청 한 건 · 응답 상태 판정) → `session`(로그인 상태 · 토큰) → `runs`(조회), `failures`(오류를 화면용 모양으로)
+- `src/app/` — 조회 설정 · 로그인 상태 훅
+- `src/pages/` · `src/components/`(라우트 지키기 `SessionGuards` 포함) · `src/styles/` — 화면
 
 설계와 결정은 레포의 `Admin_Docs/features/F-011-웹-대시보드/feature.md`에 있다.

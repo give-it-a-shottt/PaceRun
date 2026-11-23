@@ -8,7 +8,7 @@ import './styles/global.css';
 import { restoreSession } from './api/session';
 import App from './App';
 
-// 사이트를 열 때 한 번: 쿠키로 로그인 상태를 되살린다(끝날 때까지 화면은 비워 둔다 — app/guards.tsx)
+// 사이트를 열 때 한 번: 쿠키로 로그인 상태를 되살린다(끝날 때까지 화면은 비워 둔다 — components/SessionGuards.tsx)
 void restoreSession();
 
 createRoot(document.getElementById('root')!).render(

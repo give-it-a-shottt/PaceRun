@@ -5,7 +5,10 @@ import { authorizedGet } from './session';
 
 /** 서버가 한 번에 주는 가장 큰 쪽 크기 */
 const MAX_PAGE_SIZE = 100;
-/** 목록을 끝없이 넘기지 않게 하는 안전장치 */
+/**
+ * 목록을 끝없이 넘기지 않게 하는 안전장치: 20쪽 × 100건 = 최근 2000건까지만 본다.
+ * 그보다 오래된 러닝은 주 목표 카드와 "지난번 비교"에서 보이지 않는다(주 목표가 돌아보는 기간 안에 2000번 넘게 뛰지 않는 한 닿지 않는다).
+ */
 const MAX_PAGES = 20;
 
 export function fetchStats(period: StatsPeriod, anchor: string, tz: string): Promise<Stats> {

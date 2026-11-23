@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { ApiError, NetworkError } from '../api/client';
+import { ApiError, isNotFound, NetworkError } from '../api/client';
 import { SessionExpiredError } from '../api/session';
-import { isNotFound, isShownFailure, shouldRetry } from './queryClient';
+import { isShownFailure, shouldRetry } from './queryClient';
 
 describe('없는 기록인지', () => {
   it('404와 422(번호의 모양이 틀림)는 없는 기록이다. 그 밖의 실패는 아니다', () => {

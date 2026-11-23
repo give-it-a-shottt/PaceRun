@@ -2,7 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
-import { ClearCacheOnSignOut, GuestOnly, RequireSession } from './app/guards';
+import { ClearCacheOnSignOut, GuestOnly, RequireSession } from './components/SessionGuards';
 import { createQueryClient } from './app/queryClient';
 import { AppLayout } from './components/AppLayout';
 import { ErrorBoundary } from './components/ErrorBoundary';

@@ -74,9 +74,9 @@ export function formatListDateTime(iso: string): string {
   return `${monthDayWeekday(date)} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
 }
 
-/** 날짜 "11월 20일" */
-export function formatMonthDay(iso: string): string {
-  const date = new Date(iso);
+/** 날짜 "11월 20일" (ISO 문자열 또는 epoch 밀리초) */
+export function formatMonthDay(time: string | number): string {
+  const date = new Date(time);
   return `${date.getMonth() + 1}월 ${date.getDate()}일`;
 }
 

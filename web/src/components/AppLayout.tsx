@@ -20,7 +20,7 @@ export function AppLayout() {
   const location = useLocation();
   const [logOutStatus, setLogOutStatus] = useState<'idle' | 'pending' | 'failed'>('idle');
 
-  // logOut은 던지지 않는다. 되면 상태가 signedOut이 되어 로그인 화면으로 간다(app/guards.tsx).
+  // logOut은 던지지 않는다. 되면 상태가 signedOut이 되어 로그인 화면으로 간다(SessionGuards.tsx).
   // 서버에 닿지 못하면 로그인된 채로 남으므로, 알리고 다시 누를 수 있게 한다.
   const handleLogOut = async () => {
     setLogOutStatus('pending');

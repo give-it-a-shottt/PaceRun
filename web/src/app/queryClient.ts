@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/react-query';
 
-import { ApiError } from '../api/client';
+import { isClientError } from '../api/client';
 import { SessionExpiredError } from '../api/session';
 
 /** 서버에 닿지 못했거나 서버 쪽 오류(5xx)일 때 다시 해 보는 횟수 */
@@ -8,27 +8,11 @@ const MAX_RETRIES = 2;
 /** 이 시간 안에는 같은 조회를 다시 보내지 않는다(탭을 오갈 때마다 다시 읽지 않게) */
 const STALE_TIME_MS = 30_000;
 
-const HTTP_CLIENT_ERROR_MIN = 400;
-const HTTP_SERVER_ERROR_MIN = 500;
-
 /** 다시 보내도 결과가 같을 실패(로그인이 풀림 · 4xx)는 다시 하지 않는다. */
 export function shouldRetry(failureCount: number, error: unknown): boolean {
   if (error instanceof SessionExpiredError) return false;
-  if (error instanceof ApiError && error.status >= HTTP_CLIENT_ERROR_MIN && error.status < HTTP_SERVER_ERROR_MIN) {
-    return false;
-  }
+  if (isClientError(error)) return false;
   return failureCount < MAX_RETRIES;
-}
-
-const HTTP_NOT_FOUND = 404;
-const HTTP_UNPROCESSABLE = 422;
-
-/**
- * "그런 기록이 없다"는 답인가. 서버는 없는 번호에 404를, 번호의 모양이 틀리면(UUID가 아님) 422를 준다 —
- * 둘 다 주소가 가리키는 기록이 없는 것이다.
- */
-export function isNotFound(error: unknown): boolean {
-  return error instanceof ApiError && (error.status === HTTP_NOT_FOUND || error.status === HTTP_UNPROCESSABLE);
 }
 
 /** 화면에 "불러오지 못했어요"를 띄울 실패인가. 로그인이 풀린 것은 로그인 화면으로 가므로 띄우지 않는다. */

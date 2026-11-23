@@ -4,7 +4,7 @@
  * 새로 고침하면 메모리가 비므로, 켤 때 쿠키로 액세스 토큰을 다시 받는다.
  */
 import type { User } from '../domain/types';
-import { ApiError, apiRequest } from './client';
+import { ApiError, apiRequest, isServerError, isUnauthorized } from './client';
 
 /**
  * loading = 쿠키로 다시 로그인해 보는 중 / signedOut = 로그인 안 됨 / signedIn = 로그인됨 /
@@ -26,8 +26,6 @@ const ACCESS_TOKEN_MARGIN_MS = 30_000;
  * 401을 받는데(서버는 이때 쿠키를 지우지 않는다), 잠깐 뒤에는 먼저 끝난 탭이 받은 새 쿠키가 실린다.
  */
 const REFRESH_RETRY_DELAY_MS = 300;
-const HTTP_UNAUTHORIZED = 401;
-const HTTP_SERVER_ERROR_MIN = 500;
 
 let state: SessionState = { status: 'loading', user: null };
 const listeners = new Set<() => void>();
@@ -67,10 +65,6 @@ export class SessionExpiredError extends Error {
     super('다시 로그인이 필요해요');
     this.name = 'SessionExpiredError';
   }
-}
-
-function isUnauthorized(error: unknown): boolean {
-  return error instanceof ApiError && error.status === HTTP_UNAUTHORIZED;
 }
 
 function requestRefresh(): Promise<TokenOut> {
@@ -113,7 +107,7 @@ function freshAccessToken(force: boolean): Promise<string> {
 
 /** 서버에 닿지 못했거나 서버 쪽 오류인가(쿠키가 살아 있을 수 있어 로그인이 풀렸다고 볼 수 없다) */
 function isServerTrouble(error: unknown): boolean {
-  if (error instanceof ApiError) return error.status >= HTTP_SERVER_ERROR_MIN;
+  if (error instanceof ApiError) return isServerError(error);
   return !(error instanceof SessionExpiredError);
 }
 
@@ -177,13 +171,13 @@ export async function authorizedGet<T>(path: string): Promise<T> {
   try {
     return await apiRequest<T>('GET', path, { accessToken: token });
   } catch (error) {
-    if (!(error instanceof ApiError && error.status === 401)) throw error;
+    if (!isUnauthorized(error)) throw error;
   }
   const retried = await freshAccessToken(true);
   try {
     return await apiRequest<T>('GET', path, { accessToken: retried });
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) {
+    if (isUnauthorized(error)) {
       signOutLocally();
       throw new SessionExpiredError();
     }

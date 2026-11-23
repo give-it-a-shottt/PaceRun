@@ -1,28 +1,15 @@
 import { CircleNotchIcon, InfoIcon, WarningIcon } from '@phosphor-icons/react';
 import { useId, useRef, useState, type ComponentProps, type FormEvent, type RefObject } from 'react';
 
-import { ApiError, NetworkError } from '../../api/client';
+import { toLoginFailure } from '../../api/failures';
 import { logIn } from '../../api/session';
 import logoMark from '../../assets/logo-mark.svg';
-import {
-  hasErrors,
-  loginFailureErrors,
-  validateLogin,
-  type LoginErrors,
-  type LoginFailure,
-} from '../../domain/loginForm';
+import { hasErrors, loginFailureErrors, validateLogin, type LoginErrors } from '../../domain/loginForm';
 import styles from './LoginPage.module.css';
 
 const LOGO_SIZE = 40;
 const HELPER_ICON_SIZE = 16;
 const BUTTON_ICON_SIZE = 20;
-
-/** 던져진 오류를 문구를 고르는 데 쓰는 모양으로 바꾼다. 오류 내용은 어디에도 찍지 않는다(입력값이 섞일 수 있다). */
-function toLoginFailure(error: unknown): LoginFailure {
-  if (error instanceof ApiError) return { kind: 'api', status: error.status, code: error.code };
-  if (error instanceof NetworkError) return { kind: 'network' };
-  return { kind: 'unknown' };
-}
 
 function FieldError({ id, message }: { id: string; message: string }) {
   return (
@@ -86,7 +73,7 @@ export function LoginPage() {
 
     setSubmitting(true);
     try {
-      // 성공하면 로그인 상태가 바뀌어 대시보드로 간다(app/guards.tsx의 GuestOnly)
+      // 성공하면 로그인 상태가 바뀌어 대시보드로 간다(components/SessionGuards.tsx의 GuestOnly)
       await logIn(email.trim(), password);
     } catch (error) {
       setErrors(loginFailureErrors(toLoginFailure(error)));

@@ -30,6 +30,36 @@ export class ApiError extends Error {
   }
 }
 
+// 웹이 뜻을 두고 보는 HTTP 상태들. 판정은 아래 함수들만 쓴다(숫자를 파일마다 적지 않는다).
+const HTTP_CLIENT_ERROR_MIN = 400;
+const HTTP_UNAUTHORIZED = 401;
+const HTTP_NOT_FOUND = 404;
+const HTTP_UNPROCESSABLE = 422;
+const HTTP_SERVER_ERROR_MIN = 500;
+
+/** 로그인이 필요하다 · 토큰을 받지 않는다(401) */
+export function isUnauthorized(error: unknown): boolean {
+  return error instanceof ApiError && error.status === HTTP_UNAUTHORIZED;
+}
+
+/** 요청이 틀렸다는 답(4xx). 다시 보내도 결과가 같다 */
+export function isClientError(error: unknown): boolean {
+  return error instanceof ApiError && error.status >= HTTP_CLIENT_ERROR_MIN && error.status < HTTP_SERVER_ERROR_MIN;
+}
+
+/** 서버 쪽 오류(5xx) */
+export function isServerError(error: unknown): boolean {
+  return error instanceof ApiError && error.status >= HTTP_SERVER_ERROR_MIN;
+}
+
+/**
+ * "그런 기록이 없다"는 답인가. 서버는 없는 번호에 404를, 번호의 모양이 틀리면(UUID가 아님) 422를 준다 —
+ * 둘 다 주소가 가리키는 기록이 없는 것이다.
+ */
+export function isNotFound(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === HTTP_NOT_FOUND || error.status === HTTP_UNPROCESSABLE);
+}
+
 /** 서버에 닿지 못함(인터넷 없음 · 서버 꺼짐 · 시간 초과). 나중에 다시 시도하면 될 수 있다. */
 export class NetworkError extends Error {
   constructor(message = '서버에 연결하지 못했어요') {

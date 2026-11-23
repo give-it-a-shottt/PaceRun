@@ -3,8 +3,8 @@ import { useEffect, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 
 import { retryRestoreSession } from '../api/session';
-import { ErrorNotice } from '../components/LoadState';
-import { useSession } from './useSession';
+import { useSession } from '../app/useSession';
+import { ErrorNotice } from './LoadState';
 
 /** 쿠키로 로그인을 되살리는 동안: 로그인 화면이 잠깐 보였다 사라지지 않게 비워 둔다. */
 function SessionLoading() {

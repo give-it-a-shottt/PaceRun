@@ -8,7 +8,7 @@
 - 내 브라우저에서 직접 보기(`cd web` → `npm run dev`, 서버도 켜기) → 아래 "확인하지 못한 것"
 
 ## 한눈에 보기
-상태: [보완] (1차. 반영 뒤 2차 진행 중)
+상태: [통과] (2차)
 무엇을: PC 브라우저에서 내 러닝 기록을 크게 보는 사이트. 앱에서 연결한 계정으로 로그인하면 월 · 년 단위 막대 차트(거리 / 횟수 / 시간), 주 목표를 채운 주, 최근 러닝 목록이 보이고, 러닝 하나를 누르면 큰 지도와 구간 표가 나온다. 💡 비유: 앱이 운동 중에 보는 손목시계라면, 웹은 집에 와서 펼쳐 보는 운동 일지다.
 왜: 폰 화면으로는 한 주밖에 못 본다. 한 달 · 한 해를 한눈에 봐야 "꾸준히 하고 있구나"가 보인다(P3).
 
@@ -36,10 +36,10 @@
 ## 결과 (AI 작성 — 구현 후)
 - 바뀐 파일 (모두 `web/` 아래 — 새로 만든 폴더다)
   - 계산(순수 함수): `src/domain/dashboard.ts`(기간 제목 · 막대 · 합계 · 평균 페이스와 지난 기간 비교 · 기간 옮기기), `weeks.ts`(주 목표 카드: 최근 8주와 연속 주 수), `runView.ts`(러닝 목록 한 줄 · 러닝 상세 · 지난번 비교 · 모드별 목표), `loginForm.ts`(입력 확인 · 실패 문구), `format.ts`(숫자 · 날짜 표기), `types.ts`(서버 응답의 모양)
-  - 서버 통신: `src/api/client.ts`(요청 한 건: 주소 · 에러 형식 · 시간 제한) → `session.ts`(로그인 상태 · 토큰) → `runs.ts`(통계 · 목록 · 상세 조회, 목록 넘기기)
-  - 화면: `src/pages/login/` · `dashboard/` · `runs/` · `runDetail/`, `src/components/`(AppLayout · Card · LoadState · ModeBadge · RunsTable · Stat), `src/app/`(로그인 지키기 `guards.tsx`, 조회 설정 `queryClient.ts`, 다시 받을 수 있는 조각 불러오기 `lazyPart.ts`), `src/components/ErrorBoundary.tsx`, `src/pages/dashboard/useDashboardData.ts`(조회 4개와 상태 정리) · `cardState.ts`(카드의 읽는 중 · 실패 · 값 조합), `src/styles/tokens.css`(피그마 변수와 같은 이름의 CSS 변수)
+  - 서버 통신: `src/api/client.ts`(요청 한 건: 주소 · 에러 형식 · 시간 제한 · 응답 상태 판정) → `session.ts`(로그인 상태 · 토큰) → `runs.ts`(통계 · 목록 · 상세 조회, 목록 넘기기), `failures.ts`(던져진 오류를 문구를 고르는 모양으로)
+  - 화면: `src/pages/login/` · `dashboard/` · `runs/` · `runDetail/`, `src/components/`(AppLayout · Card · LoadState · ModeBadge · RunsTable · Stat · 로그인 지키기 `SessionGuards.tsx`), `src/app/`(조회 설정 `queryClient.ts`, 다시 받을 수 있는 조각 불러오기 `lazyPart.ts`), `src/components/ErrorBoundary.tsx`, `src/pages/dashboard/useDashboardData.ts`(조회 4개와 상태 정리) · `cardState.ts`(카드의 읽는 중 · 실패 · 값 조합), `src/styles/tokens.css`(피그마 변수와 같은 이름의 CSS 변수)
   - 설정: `vite.config.ts`(개발 서버가 `/api`를 내 PC의 API 서버로 넘김, 테스트 설정), `scripts/vitest.mjs`(T-001), `README.md`
-  - 테스트 115개: `domain/dashboard.test.ts` 21 · `weeks.test.ts` 13 · `runView.test.ts` 12 · `loginForm.test.ts` 5 · `api/client.test.ts` 8 · `session.test.ts` 22 · `app/queryClient.test.ts` 6 · `app/lazyPart.test.ts` 5 · `pages/dashboard/dashboardQuery.test.ts` 10 · `cardState.test.ts` 13
+  - 테스트 118개: `domain/dashboard.test.ts` 21 · `weeks.test.ts` 13 · `runView.test.ts` 12 · `loginForm.test.ts` 5 · `api/client.test.ts` 8 · `session.test.ts` 22 · `failures.test.ts` 3 · `app/queryClient.test.ts` 6 · `app/lazyPart.test.ts` 5 · `pages/dashboard/dashboardQuery.test.ts` 10 · `cardState.test.ts` 13
 - 실제 구조
   - 화면은 값을 계산하지 않는다. `describeDashboard()` · `describeGoalWeeks()` · `describeRunDetail()`이 만든 글자와 숫자를 그린다(앱과 같은 방식). 조회는 TanStack Query가 맡고, 조회 함수는 `api/runs.ts`에 있다.
   - 토큰(D-006의 웹 쪽): 액세스 토큰은 메모리에만 둔다. 리프레시 토큰은 서버가 주는 httpOnly 쿠키로만 다녀서 자바스크립트가 읽을 수 없다(localStorage · sessionStorage를 쓰지 않는다). 새로 고침하면 메모리가 비므로 사이트를 열 때 쿠키로 액세스 토큰을 다시 받는다. 조회가 401을 받으면 한 번 다시 받아 보내고, 그래도 안 되면 로그인 화면으로 간다. 쿠키 갱신이 401이면 0.3초 뒤에 한 번 더 해 본다(탭 두 개가 동시에 갱신한 경우). 사이트를 열 때 서버에 닿지 못하면 로그인 화면으로 보내지 않고 "서버에 연결하지 못했어요"와 [다시 시도]를 보여 준다. 로그아웃은 서버가 쿠키를 지워야 끝난다 — 서버에 닿지 못하면 로그아웃하지 못했다고 알리고 로그인된 채로 둔다.
@@ -47,6 +47,7 @@
   - 대시보드의 기간 · 단위 · 보는 값은 주소(`?period=year&anchor=2026-01-01&metric=count`)에 둔다. 새로 고침 · 뒤로 가기에 남는다.
   - 주 목표 카드(최근 8주 · 연속 주 수)는 서버 통계에 없는 값이라 러닝 목록을 26주 전까지 읽어 웹에서 센다. 그래서 연속 주 수는 26주까지만 센다.
   - 러닝 상세의 "지난번 비교"는 목록을 최신순으로 넘기며 같은 모드의 바로 앞 기록을 찾는다(찾으면 멈춘다).
+  - 러닝 목록 넘기기는 20쪽(최근 2000건)까지만 한다. 그보다 오래된 러닝은 주 목표 카드와 지난번 비교에서 빠진다(알림은 없다).
   - 차트(recharts)와 지도(leaflet)는 그 화면에 들어갈 때만 불러온다. 받지 못하면 그 자리만 "불러오지 못했어요"를 보여 주고(오류 경계), 사이트의 나머지는 그대로 쓴다.
   - 기준 날짜는 서버가 받는 범위(2000-01-01 ~ 오늘) 안으로 맞춘다. 더 갈 수 없으면 [이전] · [다음]을 누를 수 없다.
 - 설계 의도와 다른 점
@@ -69,7 +70,7 @@
 - 확인하지 못한 것: 실제 브라우저 창에서의 키보드 조작 · 화면 읽기, Safari · Firefox, 로그인이 만료된 채(30일) 열었을 때, 서버가 느리거나 꺼졌을 때의 화면(코드와 테스트로만), 기록이 수백 건일 때, 배포한 상태(API가 다른 주소)
 
 ## 리뷰
-- [review/SUMMARY.md](review/SUMMARY.md) — 1차(2026-11-23) [보완]: 위험 0 · 주의 3 · 제안 12 → 반영, 2차 진행 중
+- [review/SUMMARY.md](review/SUMMARY.md) — 1차(2026-11-23) [보완]: 위험 0 · 주의 3 · 제안 12 → 반영. 2차(2026-11-23) [통과]: 위험 0 · 주의 0 · 제안 13 → 9개 반영 · 1개 일부 반영 · 3개는 이유와 함께 남김(3차 없음)
 
 ## 열린 질문
 - Q-005 (주 목표를 바꾸면 지난 주들도 다시 셀까), Q-011 (차트의 목표선), Q-012 (10분 미만 기록과 지난번 비교)
