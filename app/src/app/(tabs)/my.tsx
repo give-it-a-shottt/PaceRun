@@ -1,6 +1,10 @@
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 
+import { AccountHeader } from '@/components/account/AccountHeader';
+import { openLogin } from '@/components/account/accountNav';
+import { useAccountView } from '@/components/account/useAccountView';
 import { Screen } from '@/components/Screen';
 import { CadenceSheet } from '@/components/settings/CadenceSheet';
 import { ListRow } from '@/components/settings/ListRow';
@@ -22,6 +26,7 @@ type SheetKey = 'weeklyGoal' | 'reminder' | 'voiceInterval' | 'cadence' | 'runTh
 /** MY_01_001 내 정보 · 설정. 바꾸면 바로 저장한다([저장] 버튼이 없다). */
 export default function MyScreen() {
   const { view, recheckNotifications } = useSettingsView();
+  const account = useAccountView();
   const update = useSettingsStore((s) => s.update);
   const [sheet, setSheet] = useState<SheetKey | null>(null);
 
@@ -32,7 +37,8 @@ export default function MyScreen() {
       <TopBar variant="title" title="내 정보" />
 
       <ScrollView style={styles.flex} contentContainerStyle={styles.scroll}>
-        {/* F-010: 계정 영역(로그인 상태 · [계정 연결하고 웹에서 보기])과 그 아래 Band가 여기에 들어간다 */}
+        <AccountHeader view={account} onConnect={openLogin} />
+        <Band />
 
         <SettingsSection title="러닝 목표">
           <ListRow type="value" title="주 목표" value={view.weeklyGoalText} onPress={() => setSheet('weeklyGoal')} />
@@ -66,7 +72,12 @@ export default function MyScreen() {
 
         <Band />
         <SettingsSection title="기록">
-          {/* F-010: "동기화 상태" 행이 여기(배터리 최적화 확인 위)에 들어간다 */}
+          <ListRow
+            type="value"
+            title="동기화 상태"
+            value={account.rowText}
+            onPress={() => router.navigate('/my/sync')}
+          />
           <ListRow type="link" title="배터리 최적화 확인" onPress={() => void openBatterySettings()} />
         </SettingsSection>
       </ScrollView>

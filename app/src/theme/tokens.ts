@@ -56,6 +56,8 @@ export const lightColors = {
   statusWarningBase: '#e0a100',
   statusWarningText: '#8a6200',
   statusWarningBg: '#fff8e6',
+  /** 입력 오류의 테두리 · 아이콘(피그마 Input의 Error) */
+  statusErrorBase: '#e5484d',
   /** 피그마 화면에 오류 색 변수가 없어 임시로 둔 값이다(입력 오류 문구용). */
   statusErrorText: '#b3261e',
 } as const;

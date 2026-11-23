@@ -16,6 +16,7 @@ export { CaretRightIcon } from 'phosphor-react-native/src/icons/CaretRight';
 export { ChartBarIcon } from 'phosphor-react-native/src/icons/ChartBar';
 export { CheckIcon } from 'phosphor-react-native/src/icons/Check';
 export { CheckCircleIcon } from 'phosphor-react-native/src/icons/CheckCircle';
+export { CloudArrowUpIcon } from 'phosphor-react-native/src/icons/CloudArrowUp';
 export { FlagCheckeredIcon } from 'phosphor-react-native/src/icons/FlagCheckered';
 export { GpsSlashIcon } from 'phosphor-react-native/src/icons/GpsSlash';
 export { HouseIcon } from 'phosphor-react-native/src/icons/House';

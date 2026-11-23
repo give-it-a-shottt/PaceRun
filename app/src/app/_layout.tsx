@@ -12,6 +12,8 @@ import { ToastHost } from '@/components/Toast';
 // 앱이 죽었다가 위치 작업으로 되살아났을 때 러닝을 이어 가려면 필요하다.
 import '@/services/runController';
 import { syncReminder } from '@/services/reminder';
+import { restoreSession } from '@/services/session';
+import { requestBackgroundSync } from '@/services/sync';
 import { SETTINGS_LOAD_ERROR, useSettingsStore } from '@/state/settingsStore';
 import { ThemeProvider } from '@/theme/ThemeContext';
 import { space } from '@/theme/tokens';
@@ -45,6 +47,17 @@ export default function RootLayout() {
     });
     return () => subscription.remove();
   }, [status, reminderTime]);
+
+  // 저장해 둔 로그인 정보를 읽고, 로그인돼 있으면 올리지 못한 기록을 올린다. 앱으로 돌아올 때도 올린다
+  // (인터넷이 없어 남아 있던 기록 · 러닝을 끝낸 뒤 올라가지 못한 기록). 로그인하지 않았으면 아무것도 하지 않는다.
+  useEffect(() => {
+    if (status !== 'ready') return;
+    void restoreSession().then(requestBackgroundSync);
+    const subscription = AppState.addEventListener('change', (appState) => {
+      if (appState === 'active') requestBackgroundSync();
+    });
+    return () => subscription.remove();
+  }, [status]);
 
   if (status === 'loading') return null;
 

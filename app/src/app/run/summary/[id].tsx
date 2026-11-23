@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
@@ -10,6 +10,7 @@ import { useAndroidBack } from '@/components/run/useAndroidBack';
 import { Screen } from '@/components/Screen';
 import { useLoadedValue } from '@/components/useLoadedValue';
 import { loadSummaryView } from '@/services/recordsData';
+import { requestBackgroundSync } from '@/services/sync';
 import { useSettingsStore } from '@/state/settingsStore';
 import { useTheme } from '@/theme/ThemeContext';
 import { layout, space } from '@/theme/tokens';
@@ -25,6 +26,11 @@ export default function RunSummaryScreen() {
   const weeklyGoal = useSettingsStore((s) => s.settings.weeklyGoal);
   const load = useCallback(() => loadSummaryView(id, Date.now(), weeklyGoal), [id, weeklyGoal]);
   const { state, retry } = useLoadedValue(load, 'summary');
+
+  // 러닝을 막 끝내고 오는 화면이다. 로그인돼 있으면 방금 저장한 기록을 올린다(실패해도 폰에 남아 다음에 올라간다).
+  useEffect(() => {
+    requestBackgroundSync();
+  }, []);
 
   // 뒤로 가기로 끝난 러닝 화면(카운트다운 등)으로 돌아가지 않고 홈으로 간다
   useAndroidBack(goHome);

@@ -9,7 +9,7 @@
 ## 한눈에 보기
 이 서비스는: 화면을 안 보고 소리 안내로 뛰는 러닝앱이다. 러닝을 꾸준히 못 하는 나 자신이 쓴다. 오늘 뛸 것 하나를 2탭 안에 시작하고(10분 버전은 1탭), 뛰는 중에는 소리로 안내받고, 끝나면 발전이 보이게 한다. (AI 초안 — 사용자 위임, 확인 전. 출처: pacerun-design.md 0장 브리프)
 
-지금 상태: 됨 7 · 일부 2 · 다음 2 · 열린 질문 12개(내가 정할 것 12개)
+지금 상태: 됨 7 · 일부 3 · 다음 1 · 열린 질문 12개(내가 정할 것 12개)
 
 ### 상황별 읽는 곳
 | 언제 | 여기만 읽기 | 안 읽어도 되는 것 |
@@ -60,7 +60,7 @@
 - DB: `docker compose up -d`
 - 서버: `cd server` → `uv sync` → `uv run alembic upgrade head` → `uv run uvicorn app.main:app --reload`
 - 웹: `cd web` → `npm install` → `npm run dev`
-- 앱: `cd app` → `npm install` → `npx expo run:android` (JAVA_HOME은 Android Studio의 jbr 폴더)
+- 앱: `cd app` → `npm install` → `npx expo run:android` (JAVA_HOME은 Android Studio의 jbr 폴더). 계정 연결을 쓰려면 서버가 떠 있어야 한다. 에뮬레이터는 그대로 내 PC의 서버(8000번)를 보고, 실기기는 `app/.env`의 `EXPO_PUBLIC_API_URL`에 PC 주소를 적고 서버를 `--host 0.0.0.0`으로 띄운다
 - 테스트: 서버 `uv run pytest` · 앱 `npm test` · 웹 `npm test`
 
 주요 결정
@@ -73,5 +73,6 @@
 - D-007 러닝 번호는 폰에서 만들고, 경로는 한 칸에 통째로
 - D-008 앱 지도는 경로 선만
 - D-009 러닝 중 기기 기능은 Expo 모듈만으로
+- D-010 동기화는 폰이 올리는 한 방향이 기본, 내려받기는 로그인 직후와 [지금 동기화]
 
 최종 수정: 2026-11-22

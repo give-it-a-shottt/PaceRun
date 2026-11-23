@@ -1,5 +1,6 @@
 import type { FinishedRun } from '@/domain/home';
 import type { RunPoint, RunSegment, RunState, RunSummary } from '@/domain/runEngine';
+import type { DownloadedRun } from '@/domain/syncMapping';
 import type { RunConfig, RunMode, RunStatus, SyncState } from '@/domain/types';
 
 import type { SQLiteDatabase } from 'expo-sqlite';
@@ -251,4 +252,77 @@ export async function listRunDigests(): Promise<FinishedRun[]> {
     avgPaceSecPerKm: row.avg_pace_s_per_km,
     counted: row.counted === 1,
   }));
+}
+
+// ------------------------------------------------------------------ 서버와 맞추기(F-010)
+
+/** 아직 서버에 올리지 않은 끝난 러닝의 번호(오래된 것부터) */
+export async function listUnsyncedRunIds(): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<{ id: string }>(
+    "SELECT id FROM runs WHERE status = 'finished' AND sync_state = 'local' ORDER BY started_at",
+  );
+  return rows.map((row) => row.id);
+}
+
+/** 폰에만 있는(아직 올리지 않은) 끝난 러닝의 수 */
+export async function countUnsyncedRuns(): Promise<number> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM runs WHERE status = 'finished' AND sync_state = 'local'",
+  );
+  return row?.n ?? 0;
+}
+
+/** 서버에 올라간 러닝으로 표시한다 */
+export async function markRunSynced(id: string): Promise<void> {
+  await withWriteTransaction((db) => db.runAsync("UPDATE runs SET sync_state = 'synced' WHERE id = ?", id));
+}
+
+/** 폰에 있는 모든 러닝의 번호(끝나지 않은 것 포함 — 내려받을 때 같은 번호를 다시 넣지 않으려고) */
+export async function listRunIds(): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<{ id: string }>('SELECT id FROM runs');
+  return rows.map((row) => row.id);
+}
+
+/**
+ * 서버에서 내려받은 러닝 한 건을 끝난 러닝으로 넣는다(이미 올라가 있는 기록이므로 synced).
+ * 같은 번호가 이미 있으면 아무것도 하지 않고 false — 폰의 기록을 덮어쓰지 않는다.
+ */
+export async function insertDownloadedRun(run: DownloadedRun): Promise<boolean> {
+  return withWriteTransaction(async (db) => {
+    const inserted = await db.runAsync(
+      `INSERT OR IGNORE INTO runs
+         (id, mode, config_json, plan_label, started_at, ended_at, status, elapsed_ms, distance_m,
+          avg_pace_s_per_km, counted, sync_state, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'finished', ?, ?, ?, ?, 'synced', ?)`,
+      run.id,
+      run.mode,
+      JSON.stringify(run.config),
+      run.planLabel,
+      run.startedAt,
+      run.endedAt,
+      Math.round(run.elapsedMs),
+      run.distanceM,
+      run.avgPaceSecPerKm,
+      run.counted ? 1 : 0,
+      run.endedAt,
+    );
+    if (inserted.changes === 0) return false;
+    await insertPoints(db, run.id, run.points);
+    for (const segment of run.segments) {
+      await db.runAsync(
+        `INSERT OR REPLACE INTO run_segments (run_id, idx, kind, started_elapsed_ms, duration_ms, distance_m)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        run.id,
+        segment.idx,
+        segment.kind,
+        Math.round(segment.startedElapsedMs),
+        Math.round(segment.durationMs),
+        segment.distanceM,
+      );
+    }
+    return true;
+  });
 }
