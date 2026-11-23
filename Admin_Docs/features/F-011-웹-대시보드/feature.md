@@ -37,9 +37,9 @@
 - 바뀐 파일 (모두 `web/` 아래 — 새로 만든 폴더다)
   - 계산(순수 함수): `src/domain/dashboard.ts`(기간 제목 · 막대 · 합계 · 평균 페이스와 지난 기간 비교 · 기간 옮기기), `weeks.ts`(주 목표 카드: 최근 8주와 연속 주 수), `runView.ts`(러닝 목록 한 줄 · 러닝 상세 · 지난번 비교 · 모드별 목표), `loginForm.ts`(입력 확인 · 실패 문구), `format.ts`(숫자 · 날짜 표기), `types.ts`(서버 응답의 모양)
   - 서버 통신: `src/api/client.ts`(요청 한 건: 주소 · 에러 형식 · 시간 제한) → `session.ts`(로그인 상태 · 토큰) → `runs.ts`(통계 · 목록 · 상세 조회, 목록 넘기기)
-  - 화면: `src/pages/login/` · `dashboard/` · `runs/` · `runDetail/`, `src/components/`(AppLayout · Card · LoadState · ModeBadge · RunsTable · Stat), `src/app/`(로그인 지키기 `guards.tsx`, 조회 설정 `queryClient.ts`), `src/styles/tokens.css`(피그마 변수와 같은 이름의 CSS 변수)
+  - 화면: `src/pages/login/` · `dashboard/` · `runs/` · `runDetail/`, `src/components/`(AppLayout · Card · LoadState · ModeBadge · RunsTable · Stat), `src/app/`(로그인 지키기 `guards.tsx`, 조회 설정 `queryClient.ts`, 다시 받을 수 있는 조각 불러오기 `lazyPart.ts`), `src/components/ErrorBoundary.tsx`, `src/pages/dashboard/useDashboardData.ts`(조회 4개와 상태 정리) · `cardState.ts`(카드의 읽는 중 · 실패 · 값 조합), `src/styles/tokens.css`(피그마 변수와 같은 이름의 CSS 변수)
   - 설정: `vite.config.ts`(개발 서버가 `/api`를 내 PC의 API 서버로 넘김, 테스트 설정), `scripts/vitest.mjs`(T-001), `README.md`
-  - 테스트 87개: `domain/dashboard.test.ts` 19 · `weeks.test.ts` 13 · `runView.test.ts` 12 · `loginForm.test.ts` 5 · `api/client.test.ts` 8 · `session.test.ts` 17 · `app/queryClient.test.ts` 5 · `pages/dashboard/dashboardQuery.test.ts` 8
+  - 테스트 115개: `domain/dashboard.test.ts` 21 · `weeks.test.ts` 13 · `runView.test.ts` 12 · `loginForm.test.ts` 5 · `api/client.test.ts` 8 · `session.test.ts` 22 · `app/queryClient.test.ts` 6 · `app/lazyPart.test.ts` 5 · `pages/dashboard/dashboardQuery.test.ts` 10 · `cardState.test.ts` 13
 - 실제 구조
   - 화면은 값을 계산하지 않는다. `describeDashboard()` · `describeGoalWeeks()` · `describeRunDetail()`이 만든 글자와 숫자를 그린다(앱과 같은 방식). 조회는 TanStack Query가 맡고, 조회 함수는 `api/runs.ts`에 있다.
   - 토큰(D-006의 웹 쪽): 액세스 토큰은 메모리에만 둔다. 리프레시 토큰은 서버가 주는 httpOnly 쿠키로만 다녀서 자바스크립트가 읽을 수 없다(localStorage · sessionStorage를 쓰지 않는다). 새로 고침하면 메모리가 비므로 사이트를 열 때 쿠키로 액세스 토큰을 다시 받는다. 조회가 401을 받으면 한 번 다시 받아 보내고, 그래도 안 되면 로그인 화면으로 간다. 쿠키 갱신이 401이면 0.3초 뒤에 한 번 더 해 본다(탭 두 개가 동시에 갱신한 경우). 사이트를 열 때 서버에 닿지 못하면 로그인 화면으로 보내지 않고 "서버에 연결하지 못했어요"와 [다시 시도]를 보여 준다. 로그아웃은 서버가 쿠키를 지워야 끝난다 — 서버에 닿지 못하면 로그아웃하지 못했다고 알리고 로그인된 채로 둔다.
