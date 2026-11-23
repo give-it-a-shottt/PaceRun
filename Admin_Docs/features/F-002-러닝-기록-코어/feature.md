@@ -54,7 +54,7 @@
   - 화면 부품: `components/run/`(RunSetupSheet · ModeCard · ConfigAdjuster · BatteryBanner · GpsNotice · LocationAlert · RunDashboard · RunNow · Stat · HoldToFinishButton · RunBottomActions · RunSummaryView · PocketMode · TextLink, 훅 useStartRun · usePendingRunRecovery · useHoldProgress · useAndroidBack). 목표값 한 칸 늘리기 · 줄이기 계산은 `domain/configFields.ts`(순수 함수), `components/ModeBadge.tsx`
   - 소리 파일: `app/assets/audio/`(무음 1개 + 메트로놈 9개), 만드는 스크립트 `app/scripts/make_audio.py`
   - 테스트: `domain/runEngine.test.ts`, `runView.test.ts`, `runConfig.test.ts`, `configFields.test.ts`, `services/runController.test.ts`, `db/schema.test.ts`(보강), `db/database.test.ts`
-  - 다음 기능용으로 미리 둔 함수(이번 기능에서는 부르는 곳이 없다): `db/runsRepo.ts`의 listFinishedRuns · getPreviousRunOfMode · getRunPoints · getRunSegments, `services/runHistory.ts`의 loadRunDetail → F-004 · F-006에서 쓴다
+  - 다음 기능용으로 미리 둔 함수(이번 기능에서는 부르는 곳이 없다): `db/runsRepo.ts`의 listFinishedRuns · getPreviousRunOfMode · getRunPoints · getRunSegments, `services/runHistory.ts`의 loadRunDetail → F-004 · F-006에서 쓴다 (F-006에서 getRunPoints · getRunSegments를 쓰기 시작했다. listFinishedRuns · getPreviousRunOfMode · runHistory.ts는 쓸 일이 없어져 지웠다)
 - 실제 구조
   - 계산은 전부 `runEngine`의 순수 함수가 한다. `runController`는 "위치가 왔을 때 · 1초 타이머가 울렸을 때 계산 함수를 부르고, 결과를 화면 상태 · DB · 음성으로 보내는" 일만 한다(D-005).
   - 진행 값 · 새 위치 점 · 복구용 상태(active_run)를 약 1초마다 한 트랜잭션으로 저장한다. 저장에 실패한 점은 버리지 않고 다음 저장 때 다시 넣는다.

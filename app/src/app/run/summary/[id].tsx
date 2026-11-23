@@ -8,13 +8,14 @@ import { RunBottomActions } from '@/components/run/RunBottomActions';
 import { RunSummaryView } from '@/components/run/RunSummaryView';
 import { useAndroidBack } from '@/components/run/useAndroidBack';
 import { Screen } from '@/components/Screen';
-import { loadRun, type RunRecord } from '@/services/runHistory';
+import { loadSummaryView, type RoutePosition, type SummaryView } from '@/services/recordsData';
+import { useSettingsStore } from '@/state/settingsStore';
 import { useTheme } from '@/theme/ThemeContext';
 import { layout, space } from '@/theme/tokens';
 
 type LoadState =
   | { status: 'loading' }
-  | { status: 'ready'; record: RunRecord }
+  | { status: 'ready'; view: SummaryView; route: RoutePosition[] }
   | { status: 'missing' }
   | { status: 'failed' };
 
@@ -26,6 +27,7 @@ function goHome() {
 export default function RunSummaryScreen() {
   const { scheme } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const weeklyGoal = useSettingsStore((s) => s.settings.weeklyGoal);
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
 
@@ -34,9 +36,9 @@ export default function RunSummaryScreen() {
 
   useEffect(() => {
     let cancelled = false;
-    loadRun(id)
-      .then((record) => {
-        if (!cancelled) setState(record ? { status: 'ready', record } : { status: 'missing' });
+    loadSummaryView(id, Date.now(), weeklyGoal)
+      .then((summary) => {
+        if (!cancelled) setState(summary ? { status: 'ready', ...summary } : { status: 'missing' });
       })
       .catch((error) => {
         console.warn('[summary] 기록을 읽지 못했어요', error);
@@ -45,7 +47,7 @@ export default function RunSummaryScreen() {
     return () => {
       cancelled = true;
     };
-  }, [id, attempt]);
+  }, [id, weeklyGoal, attempt]);
 
   const retry = () => {
     setState({ status: 'loading' });
@@ -60,7 +62,7 @@ export default function RunSummaryScreen() {
         </AppText>
       </View>
 
-      {state.status === 'ready' ? <RunSummaryView record={state.record} /> : null}
+      {state.status === 'ready' ? <RunSummaryView view={state.view} route={state.route} /> : null}
       {/* 폰 안의 DB라 금방 읽힌다. 깜빡이지 않게 읽는 동안은 비워 둔다. */}
       {state.status === 'loading' ? <View style={styles.fill} /> : null}
       {state.status === 'missing' ? (

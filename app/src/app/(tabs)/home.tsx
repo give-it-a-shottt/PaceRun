@@ -1,5 +1,5 @@
-import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { router } from 'expo-router';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { AlertDialog } from '@/components/AlertDialog';
@@ -10,15 +10,14 @@ import { TodayCardView } from '@/components/home/TodayCardView';
 import { useHomeView } from '@/components/home/useHomeView';
 import { WeekSummary } from '@/components/home/WeekSummary';
 import { ChartBarIcon, PlayIcon, TimerIcon } from '@/components/icons';
-import { GpsNotice } from '@/components/run/GpsNotice';
-import { LocationAlert } from '@/components/run/LocationAlert';
+import { QuickRunGpsLinks, QuickRunGpsNotice, QuickRunLocationAlert } from '@/components/run/QuickRunFeedback';
 import { RunSetupSheet } from '@/components/run/RunSetupSheet';
 import { TextLink } from '@/components/run/TextLink';
 import { pendingRunMessage, usePendingRunRecovery } from '@/components/run/usePendingRunRecovery';
-import { useStartRun } from '@/components/run/useStartRun';
+import { useQuickRun } from '@/components/run/useQuickRun';
 import { Screen } from '@/components/Screen';
 import { TopBar } from '@/components/TopBar';
-import { QUICK_RUN_CONFIG, QUICK_RUN_LABEL } from '@/domain/runConfig';
+import { QUICK_RUN_LABEL } from '@/domain/runConfig';
 import type { RunConfig } from '@/domain/types';
 import { useTheme } from '@/theme/ThemeContext';
 import { layout, space } from '@/theme/tokens';
@@ -31,16 +30,9 @@ export default function HomeScreen() {
   const { colors } = useTheme();
   const [sheet, setSheet] = useState<SheetRequest | null>(null);
   const { state: home, reload } = useHomeView();
-  const quickRun = useStartRun();
   const recovery = usePendingRunRecovery();
-  const cancelQuickRun = quickRun.cancel;
-
-  useFocusEffect(
-    useCallback(() => {
-      // 다른 탭으로 가면 [10분만 뛰기]의 GPS 확인을 멈춘다
-      return () => cancelQuickRun();
-    }, [cancelQuickRun]),
-  );
+  // 끝나지 않은 러닝이 있으면 그것부터 정리해야 새 러닝을 시작할 수 있다
+  const quickRun = useQuickRun({ canStart: () => !recovery.reopenIfPending() });
 
   const openSheet = (request: SheetRequest) => {
     // 끝나지 않은 러닝이 있으면 그것부터 정리해야 새 러닝을 시작할 수 있다
@@ -48,13 +40,6 @@ export default function HomeScreen() {
     setSheet(request);
   };
 
-  const startQuickRun = () => {
-    if (recovery.reopenIfPending()) return;
-    // 시트를 거치지 않으므로 '마지막 설정'은 바꾸지 않는다
-    void quickRun.start({ config: QUICK_RUN_CONFIG, planLabel: QUICK_RUN_LABEL, remember: false });
-  };
-
-  const searchingGps = quickRun.phase === 'searchingGps';
   const today = home.view?.today ?? null;
 
   const startButton = (label: string, request: SheetRequest) => (
@@ -67,7 +52,7 @@ export default function HomeScreen() {
       icon={TimerIcon}
       iconWeight="regular"
       loading={quickRun.busy}
-      onPress={startQuickRun}
+      onPress={quickRun.start}
     />
   );
 
@@ -157,14 +142,9 @@ export default function HomeScreen() {
           </Card>
         ) : null}
 
-        {searchingGps ? <GpsNotice /> : null}
+        <QuickRunGpsNotice quickRun={quickRun} />
         <View style={styles.actions}>{actions()}</View>
-        {searchingGps ? (
-          <View style={styles.links}>
-            <TextLink label="그냥 시작하기" onPress={quickRun.startAnyway} />
-            <TextLink label="취소" onPress={quickRun.cancel} />
-          </View>
-        ) : null}
+        <QuickRunGpsLinks quickRun={quickRun} />
       </View>
 
       <RunSetupSheet
@@ -174,9 +154,7 @@ export default function HomeScreen() {
         planLabel={sheet?.planLabel}
       />
 
-      {quickRun.locationIssue ? (
-        <LocationAlert issue={quickRun.locationIssue} onClose={quickRun.dismissLocationIssue} />
-      ) : null}
+      <QuickRunLocationAlert quickRun={quickRun} />
 
       <AlertDialog
         visible={recovery.pending != null && recovery.open}

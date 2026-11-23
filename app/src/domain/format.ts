@@ -50,3 +50,45 @@ export function speakDistanceKm(meters: number): string {
   const km = Math.round(meters / 100) / 10;
   return `${Number.isInteger(km) ? km : km.toFixed(1)}킬로미터`;
 }
+
+/** JS의 getDay() 순서(0 = 일요일) */
+const WEEKDAY_SHORT = ['일', '월', '화', '수', '목', '금', '토'];
+const NOON_HOUR = 12;
+
+function meridiem(date: Date): string {
+  return date.getHours() < NOON_HOUR ? '오전' : '오후';
+}
+
+/** 12시간제 시 · 분 "7:12"(0시와 12시는 12로) */
+function clockDigits(date: Date): string {
+  const hour = date.getHours() % NOON_HOUR === 0 ? NOON_HOUR : date.getHours() % NOON_HOUR;
+  return `${hour}:${pad2(date.getMinutes())}`;
+}
+
+/** 시각 "오전 7:12", "오후 9:40" */
+export function formatClock(time: number): string {
+  const date = new Date(time);
+  return `${meridiem(date)} ${clockDigits(date)}`;
+}
+
+/** 날짜 "11월 20일" */
+export function formatMonthDay(time: number): string {
+  const date = new Date(time);
+  return `${date.getMonth() + 1}월 ${date.getDate()}일`;
+}
+
+/** 날짜와 시각 "11월 20일 (목) 오전 7:12" */
+export function formatDateTime(time: number): string {
+  return `${formatMonthDay(time)} (${WEEKDAY_SHORT[new Date(time).getDay()]}) ${formatClock(time)}`;
+}
+
+/**
+ * 시작 ~ 끝 "11월 20일 (목) 오전 7:12 – 7:32". 끝이 같은 오전/오후면 되풀이하지 않고,
+ * 바뀌면 붙인다("오전 11:50 – 오후 12:20").
+ */
+export function formatTimeRange(start: number, end: number): string {
+  const from = new Date(start);
+  const to = new Date(end);
+  const endText = meridiem(from) === meridiem(to) ? clockDigits(to) : formatClock(end);
+  return `${formatDateTime(start)} – ${endText}`;
+}

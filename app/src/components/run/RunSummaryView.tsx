@@ -1,50 +1,67 @@
-import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
-import { formatDistanceKm, formatDuration, formatPace } from '@/domain/format';
-import { MODE_LABEL } from '@/domain/runView';
-import type { RunRecord } from '@/services/runHistory';
+import { WeekCells } from '@/components/home/WeekCells';
+import { ModeBadge } from '@/components/ModeBadge';
+import { ComparisonBox } from '@/components/records/ComparisonBox';
+import { RouteMap } from '@/components/records/RouteMap';
+import type { RoutePosition, SummaryView } from '@/services/recordsData';
 import { layout, space } from '@/theme/tokens';
 
 import { Stat, StatRow } from './Stat';
 
 type Props = {
-  record: RunRecord;
-  /** 맨 위 "지난번 비교" 한 줄 */
-  comparison?: ReactNode;
-  /** 지표 아래 작은 지도 */
-  routeMap?: ReactNode;
-  /** 맨 아래 이번 주 칸 */
-  week?: ReactNode;
+  view: SummaryView;
+  /** 작은 지도에 그릴 경로 */
+  route: readonly RoutePosition[];
 };
 
-/** 완료 요약의 내용(RUN_01_004). 저장된 기록을 그리기만 한다. */
-export function RunSummaryView({ record, comparison, routeMap, week }: Props) {
+/** 피그마 완료 요약의 작은 지도 높이(8:478) */
+const ROUTE_MAP_HEIGHT = 140;
+
+/** 완료 요약의 내용(RUN_01_004): 지난번 비교 → 제목 → 지표 → 작은 지도 → 이번 주 칸. 받은 값을 그리기만 한다. */
+export function RunSummaryView({ view, route }: Props) {
+  const { week } = view;
+
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-      {comparison}
+      {view.comparison ? <ComparisonBox comparison={view.comparison} /> : null}
 
-      <AppText variant="headline24SB" accessibilityRole="header">
-        {record.planLabel ?? MODE_LABEL[record.mode]}
-      </AppText>
-
-      <StatRow>
-        <Stat value={`${formatDistanceKm(record.distanceM)} km`} label="거리" />
-        <Stat value={formatDuration(record.elapsedMs)} label="시간" />
-        <Stat value={formatPace(record.avgPaceSecPerKm)} label="평균 페이스" />
-      </StatRow>
-
-      {record.counted ? (
-        <AppText variant="title16SB">오늘 1회 인정!</AppText>
-      ) : (
-        <AppText variant="body15R" color="textSub">
-          10분을 채우지 못해 횟수에는 들어가지 않았어요
+      <View style={styles.heading}>
+        <ModeBadge mode={view.mode} />
+        <AppText variant="headline24SB" accessibilityRole="header">
+          {view.title}
         </AppText>
-      )}
+        <AppText variant="caption12R" color="textSub">
+          {view.dateText}
+        </AppText>
+      </View>
 
-      {routeMap}
-      {week}
+      <View style={styles.stats}>
+        <StatRow>
+          {view.stats.map((stat) => (
+            <Stat key={stat.label} value={stat.value} label={stat.label} />
+          ))}
+        </StatRow>
+        {/* 인정된 러닝은 아래 이번 주 칸이 알려 준다. 인정되지 않았을 때만 까닭을 적는다. */}
+        {view.counted ? null : (
+          <AppText variant="body15R" color="textSub">
+            {view.countedText}
+          </AppText>
+        )}
+      </View>
+
+      <RouteMap route={route} height={ROUTE_MAP_HEIGHT} />
+
+      <View style={styles.week}>
+        <View style={styles.weekHeading}>
+          <AppText variant="title16SB" accessibilityRole="header">
+            {week.title}
+          </AppText>
+          {week.note ? <AppText variant="caption12SB">{week.note}</AppText> : null}
+        </View>
+        <WeekCells cells={week.cells} paintKey={week.paintKey} />
+      </View>
     </ScrollView>
   );
 }
@@ -57,5 +74,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: layout.screenPaddingX,
     paddingBottom: space[4],
     gap: space[6],
+  },
+  heading: { gap: space[2] },
+  stats: { gap: space[4] },
+  week: { gap: space[3] },
+  // 글자를 크게 쓰는 폰에서는 두 글이 한 줄에 안 들어갈 수 있어 줄을 바꾼다
+  weekHeading: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    columnGap: space[3],
+    rowGap: space[1],
   },
 });

@@ -227,6 +227,19 @@ describe('지난번 비교', () => {
     const runs = [run(at(11, 20), { avgPaceSecPerKm: null }), run(at(11, 10), { avgPaceSecPerKm: 380 })];
     expect(previousComparable(current, runs)?.avgPaceSecPerKm).toBe(380);
   });
+
+  it('10분을 못 채운 지난 기록은 비교의 기준으로 삼지 않는다', () => {
+    const runs = [run(at(11, 20), { avgPaceSecPerKm: 640, counted: false }), run(at(11, 10), { avgPaceSecPerKm: 380 })];
+    expect(previousComparable(current, runs)?.avgPaceSecPerKm).toBe(380);
+    expect(previousComparable(current, [runs[0]])).toBeNull();
+  });
+
+  it('차이가 1분 이상이면 분과 초로 말한다', () => {
+    expect(comparePace(current, run(at(11, 20), { avgPaceSecPerKm: 362 + 60 }))).toBe('지난번보다 페이스가 1분 빨라졌어요');
+    expect(comparePace({ ...current, avgPaceSecPerKm: 638 }, run(at(11, 20), { avgPaceSecPerKm: 365 }))).toBe(
+      '지난번보다 4분 33초 천천히 뛰었어요',
+    );
+  });
 });
 
 describe('오늘의 러닝 카드', () => {

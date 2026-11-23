@@ -18,7 +18,7 @@
 폴더
 - `app/src/app/` — expo-router 라우트 파일(화면). 화면은 서비스와 DB 쿼리를 부르기만 한다. 라우트가 아닌 코드는 이 폴더 밖에 둔다.
 - `app/src/domain/` — 순수 TypeScript 로직. React · Expo를 import하지 않는다(단위 테스트 대상).
-- `app/src/services/` — 기기 기능을 감싼 것: 위치 기록(runLocation · gps · permissions), 음성 · 메트로놈(voice · metronome), 알림(runNotification), 진동(haptics), 기록 읽기(runHistory), 홈 값 읽기(homeData), 주간 계획 읽기 · 저장(planData), 온보딩 끝내기(onboarding), 매일 알림 예약(reminder), 동기화. `runController`가 러닝 한 번의 진행(위치 · 타이머 → 계산 → 화면 상태 · DB · 음성)을 맡는다.
+- `app/src/services/` — 기기 기능을 감싼 것: 위치 기록(runLocation · gps · permissions), 음성 · 메트로놈(voice · metronome), 알림(runNotification), 진동(haptics), 홈 값 읽기(homeData), 기록 화면 값 읽기(recordsData), 주간 계획 읽기 · 저장(planData), 온보딩 끝내기(onboarding), 매일 알림 예약(reminder), 동기화. `runController`가 러닝 한 번의 진행(위치 · 타이머 → 계산 → 화면 상태 · DB · 음성)을 맡는다.
 - `app/src/db/` — expo-sqlite 스키마와 쿼리. 쓰기는 모두 `withWriteTransaction`으로 한 줄씩 한다.
 - `app/src/state/` — 화면 여러 곳이 함께 보는 메모리 상태(zustand): 설정(settingsStore), 토스트(toastStore), 진행 중인 러닝(runStore), 러닝 화면 테마(useRunScheme). DB를 불러 값을 채운다.
 - `app/plugins/` — 네이티브 빌드 설정을 덧붙이는 설정 플러그인(`android/`는 만들어지는 산출물이라 직접 고치지 않는다).
