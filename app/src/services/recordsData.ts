@@ -33,17 +33,23 @@ export async function loadRecords(now: number): Promise<RecordsView> {
   return describeRecords({ now, plan, runs });
 }
 
+/** 끝난 러닝만 보여 준다. 없는 번호이거나 아직 끝나지 않은 러닝이면 null */
+async function getFinishedRun(id: string) {
+  const run = await getRun(id);
+  return run?.status === 'finished' ? run : null;
+}
+
 /** 러닝 상세. 없는 번호(또는 아직 끝나지 않은 러닝)면 null */
 export async function loadRunDetailView(id: string): Promise<WithRoute<RunDetailView> | null> {
-  const run = await getRun(id);
-  if (!run || run.status !== 'finished') return null;
+  const run = await getFinishedRun(id);
+  if (!run) return null;
   const [segments, points, runs] = await Promise.all([getRunSegments(id), getRunPoints(id), listRunDigests()]);
   return { view: describeRunDetail({ run, segments, runs }), route: points.map(toPosition) };
 }
 
-/** 완료 요약. 없는 번호면 null */
+/** 완료 요약. 없는 번호(또는 아직 끝나지 않은 러닝)면 null */
 export async function loadSummaryView(id: string, now: number, weeklyGoal: number): Promise<WithRoute<SummaryView> | null> {
-  const run = await getRun(id);
+  const run = await getFinishedRun(id);
   if (!run) return null;
   const [points, runs, plan] = await Promise.all([getRunPoints(id), listRunDigests(), listPlanItems()]);
   return { view: describeSummary({ run, runs, plan, weeklyGoal, now }), route: points.map(toPosition) };

@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -12,15 +12,10 @@ import { SegmentTable } from '@/components/records/SegmentTable';
 import { Stat, StatRow } from '@/components/run/Stat';
 import { Screen } from '@/components/Screen';
 import { TopBar } from '@/components/TopBar';
+import { useLoadedValue } from '@/components/useLoadedValue';
 import { loadRunDetailView, type RoutePosition, type RunDetailView, type StatView } from '@/services/recordsData';
 import { useTheme } from '@/theme/ThemeContext';
 import { layout, space } from '@/theme/tokens';
-
-type LoadState =
-  | { status: 'loading' }
-  | { status: 'ready'; view: RunDetailView; route: RoutePosition[] }
-  | { status: 'missing' }
-  | { status: 'failed' };
 
 /** 피그마 러닝 상세의 작은 지도 높이(11:1248) */
 const ROUTE_MAP_HEIGHT = 180;
@@ -36,34 +31,14 @@ function goBack() {
 /** 러닝 상세(REC_01_002): 지난번 비교 · 작은 지도 · 지표 · 구간 기록. */
 export default function RunDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [state, setState] = useState<LoadState>({ status: 'loading' });
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    loadRunDetailView(id)
-      .then((detail) => {
-        if (!cancelled) setState(detail ? { status: 'ready', ...detail } : { status: 'missing' });
-      })
-      .catch((error) => {
-        console.warn('[records] 러닝 기록을 읽지 못했어요', error);
-        if (!cancelled) setState({ status: 'failed' });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [id, attempt]);
-
-  const retry = () => {
-    setState({ status: 'loading' });
-    setAttempt((n) => n + 1);
-  };
+  const load = useCallback(() => loadRunDetailView(id), [id]);
+  const { state, retry } = useLoadedValue(load, 'records');
 
   return (
     <Screen>
-      <TopBar variant="back" title={state.status === 'ready' ? state.view.headerTitle : undefined} onBack={goBack} />
+      <TopBar variant="back" title={state.status === 'ready' ? state.value.view.headerTitle : undefined} onBack={goBack} />
 
-      {state.status === 'ready' ? <RunDetail view={state.view} route={state.route} /> : null}
+      {state.status === 'ready' ? <RunDetail view={state.value.view} route={state.value.route} /> : null}
       {/* 폰 안의 DB라 금방 읽힌다. 깜빡이지 않게 읽는 동안은 비워 둔다. */}
       {state.status === 'missing' ? (
         <View style={styles.message}>

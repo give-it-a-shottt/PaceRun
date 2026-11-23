@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
@@ -8,16 +8,11 @@ import { RunBottomActions } from '@/components/run/RunBottomActions';
 import { RunSummaryView } from '@/components/run/RunSummaryView';
 import { useAndroidBack } from '@/components/run/useAndroidBack';
 import { Screen } from '@/components/Screen';
-import { loadSummaryView, type RoutePosition, type SummaryView } from '@/services/recordsData';
+import { useLoadedValue } from '@/components/useLoadedValue';
+import { loadSummaryView } from '@/services/recordsData';
 import { useSettingsStore } from '@/state/settingsStore';
 import { useTheme } from '@/theme/ThemeContext';
 import { layout, space } from '@/theme/tokens';
-
-type LoadState =
-  | { status: 'loading' }
-  | { status: 'ready'; view: SummaryView; route: RoutePosition[] }
-  | { status: 'missing' }
-  | { status: 'failed' };
 
 function goHome() {
   router.replace('/home');
@@ -28,31 +23,11 @@ export default function RunSummaryScreen() {
   const { scheme } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const weeklyGoal = useSettingsStore((s) => s.settings.weeklyGoal);
-  const [state, setState] = useState<LoadState>({ status: 'loading' });
-  const [attempt, setAttempt] = useState(0);
+  const load = useCallback(() => loadSummaryView(id, Date.now(), weeklyGoal), [id, weeklyGoal]);
+  const { state, retry } = useLoadedValue(load, 'summary');
 
   // 뒤로 가기로 끝난 러닝 화면(카운트다운 등)으로 돌아가지 않고 홈으로 간다
   useAndroidBack(goHome);
-
-  useEffect(() => {
-    let cancelled = false;
-    loadSummaryView(id, Date.now(), weeklyGoal)
-      .then((summary) => {
-        if (!cancelled) setState(summary ? { status: 'ready', ...summary } : { status: 'missing' });
-      })
-      .catch((error) => {
-        console.warn('[summary] 기록을 읽지 못했어요', error);
-        if (!cancelled) setState({ status: 'failed' });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [id, weeklyGoal, attempt]);
-
-  const retry = () => {
-    setState({ status: 'loading' });
-    setAttempt((n) => n + 1);
-  };
 
   return (
     <Screen>
@@ -62,7 +37,7 @@ export default function RunSummaryScreen() {
         </AppText>
       </View>
 
-      {state.status === 'ready' ? <RunSummaryView view={state.view} route={state.route} /> : null}
+      {state.status === 'ready' ? <RunSummaryView view={state.value.view} route={state.value.route} /> : null}
       {/* 폰 안의 DB라 금방 읽힌다. 깜빡이지 않게 읽는 동안은 비워 둔다. */}
       {state.status === 'loading' ? <View style={styles.fill} /> : null}
       {state.status === 'missing' ? (

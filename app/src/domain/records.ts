@@ -13,6 +13,8 @@ import { addDays, DAYS_PER_WEEK, startOfWeek, WEEKDAY_LABELS, WEEKDAY_NAMES, wee
 import { weekCells, weekProgress, type WeekCellView } from './weekProgress';
 
 const KM = 1000;
+/** 막대 차트 눈금의 바닥값. 이번 주 값이 모두 이보다 작아도(또는 0이어도) 이 거리를 막대 끝으로 본다 */
+const MIN_CHART_SCALE_M = 100;
 
 // ------------------------------------------------------------------ 기록 탭
 
@@ -87,8 +89,8 @@ export function describeRecords({ now, plan, runs }: RecordsInput): RecordsView 
   const totalM = perDay.reduce((sum, meters) => sum + meters, 0);
 
   const goalM = goalDistanceM(plan);
-  // 막대와 목표선이 모두 들어가게 가장 큰 값에 맞춘다. 모두 0이면 1km를 기준으로 둔다(0으로 나누지 않게).
-  const scaleM = Math.max(...perDay, goalM ?? 0, KM / 10) || KM;
+  // 막대와 목표선이 모두 들어가게 가장 큰 값에 맞춘다. 바닥값이 있어 한 주가 비어 있어도 0으로 나누지 않는다.
+  const scaleM = Math.max(...perDay, goalM ?? 0, MIN_CHART_SCALE_M);
 
   const bars = WEEKDAY_LABELS.map((label, index): ChartBarView => {
     const meters = perDay[index];
@@ -233,9 +235,8 @@ export type SummaryView = {
   /** "11월 20일 (목) 오전 7:12" */
   dateText: string;
   stats: StatView[];
-  /** "오늘 1회 인정!" 또는 10분을 못 채웠다는 안내 */
-  countedText: string;
-  counted: boolean;
+  /** 10분을 못 채운 기록이면 그 사실을 한 줄로. 인정된 러닝이면 null(아래 이번 주 칸이 알려 준다) */
+  note: string | null;
   week: {
     /** "이번 주 3 / 3회" */
     title: string;
@@ -263,8 +264,7 @@ export function describeSummary(input: {
     title: runTitle(run),
     dateText: formatDateTime(run.startedAt),
     stats: statsFor(run, ''),
-    countedText: run.counted ? '오늘 1회 인정!' : NOT_COUNTED_NOTE,
-    counted: run.counted,
+    note: run.counted ? null : NOT_COUNTED_NOTE,
     week: {
       title: `이번 주 ${progress.count} / ${progress.goal}회`,
       note: progress.met ? streakNote : null,

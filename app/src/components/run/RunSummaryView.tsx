@@ -44,11 +44,11 @@ export function RunSummaryView({ view, route }: Props) {
           ))}
         </StatRow>
         {/* 인정된 러닝은 아래 이번 주 칸이 알려 준다. 인정되지 않았을 때만 까닭을 적는다. */}
-        {view.counted ? null : (
+        {view.note ? (
           <AppText variant="body15R" color="textSub">
-            {view.countedText}
+            {view.note}
           </AppText>
-        )}
+        ) : null}
       </View>
 
       <RouteMap route={route} height={ROUTE_MAP_HEIGHT} />

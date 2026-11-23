@@ -256,8 +256,7 @@ describe('완료 요약', () => {
       mode: 'interval',
       title: '인터벌 입문 3회차',
       dateText: '11월 19일 (목) 오후 8:30',
-      countedText: '오늘 1회 인정!',
-      counted: true,
+      note: null,
     });
     // 요약 화면의 페이스에는 "/km"를 붙이지 않는다(피그마)
     expect(view.stats.map((stat) => stat.value)).toEqual(['3.12 km', '18:49', `6'02"`]);
@@ -279,8 +278,7 @@ describe('완료 요약', () => {
   it('10분을 못 채웠으면 인정되지 않았다고 알리고 칸을 칠하지 않는다', () => {
     const finished = run(at(11, 19), { id: 'now', counted: false, elapsedMs: 5 * 60_000 });
     const view = describeSummary({ run: finished, runs: [finished], plan: [], weeklyGoal: 3, now: THURSDAY });
-    expect(view.countedText).toBe('10분을 채우지 못해 횟수에는 들어가지 않았어요');
-    expect(view.counted).toBe(false);
+    expect(view.note).toBe('10분을 채우지 못해 횟수에는 들어가지 않았어요');
     expect(view.week.paintKey).toBeNull();
     expect(view.week.cells[3].state).toBe('today');
   });
