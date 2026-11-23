@@ -3,9 +3,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { CaretDownIcon, CaretRightIcon } from '@/components/icons';
-import { ReminderFields } from '@/components/settings/ReminderFields';
-import { formatReminderClock } from '@/domain/reminderTime';
-import type { ReminderChoice } from '@/domain/settingsView';
+import { ReminderFields } from '@/components/ReminderFields';
+import { reminderSummaryText, type ReminderChoice } from '@/domain/settingsView';
 import { useTheme } from '@/theme/ThemeContext';
 import { space } from '@/theme/tokens';
 
@@ -23,7 +22,7 @@ const ROW_HEIGHT = 56;
 export function ReminderTimePicker({ value, onChange }: Props) {
   const { colors } = useTheme();
   const [open, setOpen] = useState(false);
-  const summary = value.enabled ? `매일 ${formatReminderClock(value.clock)}` : '끔';
+  const summary = reminderSummaryText(value);
   const Caret = open ? CaretDownIcon : CaretRightIcon;
 
   return (

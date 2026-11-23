@@ -4,7 +4,7 @@ import { reminderChoiceOf, reminderTimeOf, type ReminderChoice } from '@/domain/
 import { requestNotificationAccess } from '@/services/permissions';
 import { useSettingsStore } from '@/state/settingsStore';
 
-import { ReminderFields } from './ReminderFields';
+import { ReminderFields } from '@/components/ReminderFields';
 import { SettingsSheet, type SettingsSheetProps } from './SettingsSheet';
 
 type Props = SettingsSheetProps & {

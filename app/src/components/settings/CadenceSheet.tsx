@@ -1,16 +1,11 @@
-import { canStepDefaultCadence, stepDefaultCadence } from '@/domain/settingsView';
+import { FieldPanel, StepField } from '@/components/StepField';
+import { canStepDefaultCadence, defaultCadenceText, stepDefaultCadence } from '@/domain/settingsView';
 import { useSettingsStore } from '@/state/settingsStore';
 
 import { SettingsSheet, type SettingsSheetProps } from './SettingsSheet';
-import { FieldPanel, StepField } from './StepField';
-
-type Props = SettingsSheetProps & {
-  /** 지금 값을 보여 줄 글자("분당 170걸음"). 설정 행에 보이는 것과 같은 글자를 받는다. */
-  valueText: string;
-};
 
 /** 기본 발걸음 박자를 − / + 로 한 칸씩 고치는 시트. 누를 때마다 바로 저장한다. */
-export function CadenceSheet({ visible, onClose, valueText }: Props) {
+export function CadenceSheet({ visible, onClose }: SettingsSheetProps) {
   const spm = useSettingsStore((s) => s.settings.defaultCadenceSpm);
   const update = useSettingsStore((s) => s.update);
 
@@ -21,7 +16,7 @@ export function CadenceSheet({ visible, onClose, valueText }: Props) {
       <FieldPanel>
         <StepField
           label="발걸음 박자"
-          valueText={valueText}
+          valueText={defaultCadenceText(spm)}
           canDecrease={canStepDefaultCadence(spm, -1)}
           canIncrease={canStepDefaultCadence(spm, 1)}
           onDecrease={() => step(-1)}

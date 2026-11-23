@@ -6,7 +6,7 @@ import { FlagCheckeredIcon } from '@/components/icons';
 import { OnboardingStep } from '@/components/onboarding/OnboardingStep';
 import { ReminderTimePicker } from '@/components/onboarding/ReminderTimePicker';
 import { TemplateCard } from '@/components/onboarding/TemplateCard';
-import { WeeklyGoalPicker } from '@/components/settings/WeeklyGoalPicker';
+import { WeeklyGoalPicker } from '@/components/WeeklyGoalPicker';
 import { reminderChoiceOf, reminderTimeOf, type ReminderChoice } from '@/domain/settingsView';
 import { completeOnboarding } from '@/services/onboarding';
 import { requestNotificationAccess } from '@/services/permissions';

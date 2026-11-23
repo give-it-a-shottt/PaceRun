@@ -74,7 +74,7 @@ export default function MyScreen() {
       <WeeklyGoalSheet visible={sheet === 'weeklyGoal'} onClose={close} />
       <ReminderSheet visible={sheet === 'reminder'} onClose={close} onNotificationsAsked={recheckNotifications} />
       <VoiceIntervalSheet visible={sheet === 'voiceInterval'} onClose={close} />
-      <CadenceSheet visible={sheet === 'cadence'} onClose={close} valueText={view.cadenceText} />
+      <CadenceSheet visible={sheet === 'cadence'} onClose={close} />
       <RunThemeSheet visible={sheet === 'runTheme'} onClose={close} />
     </Screen>
   );

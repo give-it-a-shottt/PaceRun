@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { CONFIG_LIMITS } from './runConfig';
 import {
   canStepDefaultCadence,
+  defaultCadenceText,
   describeSettings,
   REMINDER_BLOCKED_NOTICE,
   reminderChoiceOf,
+  reminderSummaryText,
   reminderTimeOf,
   RUN_THEME_OPTIONS,
   stepDefaultCadence,
@@ -48,6 +50,12 @@ describe('설정 화면에 그릴 값', () => {
   it('고를 수 있는 칸에 없는 발걸음 값은 가장 가까운 칸으로 보여 준다(시작 전 설정과 같게)', () => {
     expect(describeSettings(settings({ defaultCadenceSpm: 172 }), 'granted').cadenceText).toBe('분당 170걸음');
     expect(describeSettings(settings({ defaultCadenceSpm: 210 }), 'granted').cadenceText).toBe('분당 190걸음');
+  });
+
+  it('알림 시간 줄의 글자는 온보딩과 같은 함수로 만든다', () => {
+    expect(reminderSummaryText({ enabled: true, clock: { hour: 0, minute: 5 } })).toBe('매일 오전 12:05');
+    expect(reminderSummaryText({ enabled: false, clock: { hour: 7, minute: 0 } })).toBe('끔');
+    expect(defaultCadenceText(172)).toBe('분당 170걸음');
   });
 
   it('모양이 틀린 알림 시간은 끈 것으로 보여 준다', () => {
