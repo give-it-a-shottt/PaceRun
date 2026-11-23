@@ -1,7 +1,7 @@
 # 프로젝트 상태
 
 ## 내가 할 일
-- 서비스 소개 · AI가 대신 정한 결정(D-003~D-008) 확인 → START_HERE.md, decisions/
+- 서비스 소개 · AI가 대신 정한 결정(D-003~D-010) 확인 → START_HERE.md, decisions/
 - F-011 리뷰 판정 확인 · 면접 답 3개 · 내 브라우저에서 직접 보기 → features/F-011-웹-대시보드/review/SUMMARY.md, feature.md
 - F-010 리뷰 판정 확인 · 면접 답 3개 · 실기기 확인 → features/F-010-앱-계정-연결/review/SUMMARY.md, feature.md
 - F-007 리뷰 판정 확인 · 면접 답 3개 · 실기기 확인 2가지(권한 창, 알림 도착) → features/F-007-설정/review/SUMMARY.md, feature.md
