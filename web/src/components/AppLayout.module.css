@@ -1,0 +1,114 @@
+.shell {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* 1200 컨테이너: 화면이 더 좁으면 좌우 여백만 남기고 줄어든다 */
+.gnbInner,
+.main,
+.footerInner {
+  width: 100%;
+  max-width: calc(var(--container-default) + var(--space-6) * 2);
+  margin-inline: auto;
+  padding-inline: var(--space-6);
+}
+
+.gnb {
+  border-bottom: var(--line-width) solid var(--line-light);
+  background: var(--bg-default);
+}
+
+.gnbInner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  height: var(--gnb-height);
+}
+
+.brand {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-2);
+  font: var(--type-headline-20sb);
+  letter-spacing: var(--type-tracking);
+  white-space: nowrap;
+}
+
+.tabs {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--space-8);
+  height: 100%;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  border-bottom: var(--line-width-strong) solid transparent;
+  color: var(--text-sub);
+  font: var(--type-body-16r);
+  letter-spacing: var(--type-tracking);
+  white-space: nowrap;
+}
+
+.tab:hover {
+  color: var(--text-main);
+}
+
+.tabActive {
+  border-bottom-color: var(--line-black);
+  color: var(--text-main);
+  font: var(--type-title-16sb);
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+  margin-left: auto;
+  font: var(--type-body-14r);
+  letter-spacing: var(--type-tracking);
+}
+
+.email {
+  overflow: hidden;
+  color: var(--text-sub);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logOut {
+  flex-shrink: 0;
+  font: var(--type-body-14m);
+  text-decoration: underline;
+  text-underline-position: from-font;
+}
+
+.logOut:disabled {
+  color: var(--text-sub-weak);
+}
+
+.main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding-top: var(--space-10);
+  padding-bottom: var(--space-20);
+}
+
+.footer {
+  border-top: var(--line-width) solid var(--line-light);
+  background: var(--bg-default);
+}
+
+.footerInner {
+  padding-block: var(--space-6);
+  color: var(--text-sub);
+  font: var(--type-caption-12r);
+  letter-spacing: var(--type-tracking);
+}

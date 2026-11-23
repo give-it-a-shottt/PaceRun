@@ -1,0 +1,31 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-1-5);
+  border-radius: var(--radius-tag);
+  font: var(--type-caption-12m);
+  letter-spacing: var(--type-tracking);
+  white-space: nowrap;
+}
+
+/* 클래스 이름은 서버의 모드 이름과 같다 */
+.free {
+  background: var(--badge-black-soft);
+  color: var(--badge-black-text);
+}
+
+.interval {
+  background: var(--badge-plum-soft);
+  color: var(--badge-plum-text);
+}
+
+.cadence {
+  background: var(--badge-blue-soft);
+  color: var(--badge-blue-text);
+}
+
+.pacemaker {
+  background: var(--badge-green-soft);
+  color: var(--badge-green-text);
+}

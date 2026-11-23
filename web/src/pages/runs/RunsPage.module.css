@@ -1,0 +1,32 @@
+.title {
+  font: var(--type-headline-28sb);
+  letter-spacing: var(--type-tracking);
+}
+
+.more {
+  display: flex;
+  justify-content: center;
+  padding-top: var(--space-6);
+}
+
+.moreButton {
+  /* 누르는 동안 글자가 바뀌어도 너비가 흔들리지 않게 */
+  min-width: 8em;
+  height: var(--control-height-l);
+  padding: 0 var(--space-5);
+  border: var(--line-width) solid var(--line-black);
+  border-radius: var(--radius-button);
+  background: var(--bg-default);
+  color: var(--text-main);
+  font: var(--type-title-16sb);
+  letter-spacing: var(--type-tracking);
+}
+
+.moreButton:hover:not(:disabled) {
+  background: var(--bg-regular);
+}
+
+.moreButton:disabled {
+  border-color: var(--line-strong);
+  color: var(--text-sub);
+}

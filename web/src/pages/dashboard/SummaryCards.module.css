@@ -1,0 +1,106 @@
+.cardTitle {
+  color: var(--text-sub);
+  font: var(--type-body-14m);
+  letter-spacing: var(--type-tracking);
+}
+
+.headline {
+  font: var(--type-headline-28sb);
+  letter-spacing: var(--type-tracking);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 주 목표 달성: 최근 8주 칸(오래된 주 → 이번 주) */
+.weeks {
+  /* 피그마의 칸 높이 32 */
+  --week-cell-height: var(--space-8);
+
+  display: flex;
+  gap: var(--space-1-5);
+}
+
+.weekItem {
+  flex: 1;
+  min-width: 0;
+}
+
+.week {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--week-cell-height);
+  border-radius: var(--radius-tag);
+  background: var(--bg-regular);
+  color: var(--icon-main);
+}
+
+.weekMet {
+  border: var(--line-width) solid var(--line-black);
+  background: var(--sub1-base);
+}
+
+/* 이번 주는 굵은 테두리로 알린다(아직 진행 중인 주) */
+.weekCurrent {
+  border: var(--line-width-strong) solid var(--line-black);
+}
+
+.captions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--text-sub);
+  font: var(--type-caption-12r);
+  letter-spacing: var(--type-tracking);
+}
+
+.totals {
+  display: flex;
+  gap: var(--space-6);
+}
+
+.paceNote {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  color: var(--text-main);
+  font: var(--type-body-14m);
+  letter-spacing: var(--type-tracking);
+}
+
+.paceNote svg {
+  flex-shrink: 0;
+  color: var(--icon-main);
+}
+
+/* 읽는 중: 들어올 글자와 같은 줄 높이로 자리를 잡는다(1lh = 그 글자 모양의 줄 높이) */
+.skeletonTitle {
+  width: 30%;
+  height: 1lh;
+}
+
+.skeletonHeadline {
+  width: 50%;
+  height: 1lh;
+  font: var(--type-headline-28sb);
+}
+
+.skeletonWeeks {
+  height: var(--space-8);
+}
+
+.skeletonCaption {
+  width: 60%;
+  height: 1lh;
+  font: var(--type-caption-12r);
+}
+
+.skeletonCaption + .skeletonCaption {
+  /* 두 설명 줄 사이는 카드의 기본 간격(16)이 아니라 4다 */
+  margin-top: calc(var(--space-1) - var(--space-4));
+}
+
+.skeletonNote {
+  width: 70%;
+  height: 1lh;
+  font: var(--type-body-14m);
+}

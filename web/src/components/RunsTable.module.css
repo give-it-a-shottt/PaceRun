@@ -1,0 +1,92 @@
+.table {
+  /* 피그마 열 너비(날짜 200 · 모드 160 · 거리 120 · 시간 120 · 페이스 140 · 꺾쇠 24). 제목이 남는 너비를 갖는다. */
+  --col-date: 200px;
+  --col-mode: 160px;
+  --col-distance: 120px;
+  --col-duration: 120px;
+  --col-pace: 140px;
+  --col-caret: 24px;
+  /* 좁은 화면에서 제목이 사라지지 않게 지키는 너비 */
+  --col-title-min: 120px;
+  /* 배지 높이에 맞춘 줄 높이(읽는 중 자리 잡기용): 배지 글자 17 + 위아래 여백 4 × 2 */
+  --row-content-height: 25px;
+
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.head,
+.row {
+  display: grid;
+  grid-template-columns:
+    var(--col-date) var(--col-mode) minmax(var(--col-title-min), 1fr)
+    var(--col-distance) var(--col-duration) var(--col-pace) var(--col-caret);
+  align-items: center;
+  /* 화면이 열 너비의 합보다 좁으면 표 안에서 옆으로 민다(줄 밑선이 끝까지 가게) */
+  min-width: calc(
+    var(--col-date) + var(--col-mode) + var(--col-title-min) + var(--col-distance) + var(--col-duration) +
+      var(--col-pace) + var(--col-caret)
+  );
+  padding-block: var(--space-3);
+}
+
+.head {
+  border-bottom: var(--line-width) solid var(--line-strong);
+  color: var(--text-sub);
+  font: var(--type-caption-12m);
+  letter-spacing: var(--type-tracking);
+}
+
+.row {
+  position: relative;
+  min-height: calc(var(--row-content-height) + var(--space-3) * 2 + var(--line-width));
+  border-bottom: var(--line-width) solid var(--line-light);
+  color: var(--text-main);
+  font: var(--type-body-14r);
+  letter-spacing: var(--type-tracking);
+}
+
+.row:hover {
+  background: var(--bg-light);
+}
+
+.date {
+  color: var(--text-sub);
+}
+
+.title {
+  min-width: 0;
+  padding-right: var(--space-4);
+  font: var(--type-body-14m);
+}
+
+.number {
+  font-variant-numeric: tabular-nums;
+}
+
+.link::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+}
+
+/* 포커스 테두리를 제목 글자가 아니라 줄 전체에 그린다 */
+.link:focus-visible {
+  outline: none;
+}
+
+.link:focus-visible::after {
+  outline: var(--line-width-strong) solid var(--line-black);
+  outline-offset: calc(var(--space-0-5) * -1);
+}
+
+.caret {
+  color: var(--icon-main);
+}
+
+.skeletonCell {
+  grid-column: 1 / -1;
+  height: var(--row-content-height);
+}

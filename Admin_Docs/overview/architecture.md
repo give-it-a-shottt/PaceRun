@@ -24,7 +24,7 @@
 - `app/plugins/` — 네이티브 빌드 설정을 덧붙이는 설정 플러그인(`android/`는 만들어지는 산출물이라 직접 고치지 않는다).
 - `app/src/theme/` · `app/src/components/` — 디자인 토큰과 공용 컴포넌트(여러 화면이 함께 쓰는 훅도 여기: 예 `useRefreshOnFocus`). 한 기능에서만 쓰는 화면 부품은 `components/run/`처럼 기능 폴더에 둔다.
 - `server/app/routers/` → `server/app/services/` → `server/app/models/` — 의존은 이 방향으로만 흐른다. 라우터에는 요청 · 응답 변환만 둔다.
-- `web/src/pages/` · `web/src/api/` · `web/src/components/`.
+- `web/src/domain/`(화면에 그릴 값을 만드는 순수 함수) · `web/src/api/`(서버 통신: client → session → runs) · `web/src/app/`(로그인 지키기 · 조회 설정) · `web/src/pages/` · `web/src/components/` · `web/src/styles/`. 의존은 화면 → app · api → domain 방향이다(domain은 React · fetch를 쓰지 않는다).
 
 의존 방향 규칙
 - 앱: 화면 → 서비스 → state → db → domain. domain은 아무것도 의존하지 않는다(React · Expo · DB를 import하지 않음).

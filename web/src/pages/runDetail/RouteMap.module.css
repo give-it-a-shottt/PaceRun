@@ -1,0 +1,35 @@
+.map {
+  width: 100%;
+  height: 100%;
+  background: var(--bg-regular);
+  font-family: var(--font-family);
+}
+
+/* leaflet이 SVG 속성으로 넣는 기본 색 · 굵기를 덮는다 */
+.routeLine {
+  /* 피그마 Route Map의 경로 선 굵기 */
+  --route-line-width: 5px;
+
+  fill: none;
+  stroke: var(--primary-default);
+  stroke-width: var(--route-line-width);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 출발 · 도착 표시: 지도 타일 위에서도 보이게 흰 동그라미에 담는다 */
+.pin {
+  border: var(--line-width) solid var(--line-black);
+  border-radius: var(--radius-full);
+  background: var(--bg-default);
+  box-shadow: var(--shadow-2);
+  color: var(--icon-main);
+}
+
+.pinHolder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}

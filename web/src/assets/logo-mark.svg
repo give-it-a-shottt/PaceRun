@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>Pace Run 앱 아이콘 — PR 모노그램</title>
+  <defs>
+    <!-- 글자 아래 끝을 기준선(726)에서 반듯하게 자름 -->
+    <clipPath id="baseline">
+      <rect x="0" y="0" width="1024" height="726"/>
+    </clipPath>
+  </defs>
+  <!-- 바탕: 둥근 사각형, Plum primary/accent 500 -->
+  <rect x="0" y="0" width="1024" height="1024" rx="232" ry="232" fill="#8E3B5A"/>
+  <g transform="translate(-17 -26)">
+    <!-- 형광펜 밑줄: sub1 Highlighter, 1.5도 기울임 -->
+    <rect x="240" y="752" width="572" height="60" rx="8" fill="#FFD43B" transform="rotate(-1.5 526 782)"/>
+    <!-- PR 글자: 흰색 획 -->
+    <g fill="none" stroke="#FFFFFF" stroke-width="88" stroke-linejoin="round" clip-path="url(#baseline)">
+      <!-- P -->
+      <path d="M290 760 V316"/>
+      <path d="M246 316 H380 A112 112 0 0 1 380 540 H290"/>
+      <!-- R -->
+      <path d="M594 760 V316"/>
+      <path d="M550 316 H684 A112 112 0 0 1 684 540 H594"/>
+      <path d="M664 540 L800 760"/>
+    </g>
+  </g>
+</svg>

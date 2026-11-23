@@ -9,7 +9,7 @@
 ## 한눈에 보기
 이 서비스는: 화면을 안 보고 소리 안내로 뛰는 러닝앱이다. 러닝을 꾸준히 못 하는 나 자신이 쓴다. 오늘 뛸 것 하나를 2탭 안에 시작하고(10분 버전은 1탭), 뛰는 중에는 소리로 안내받고, 끝나면 발전이 보이게 한다. (AI 초안 — 사용자 위임, 확인 전. 출처: pacerun-design.md 0장 브리프)
 
-지금 상태: 됨 7 · 일부 3 · 다음 1 · 열린 질문 12개(내가 정할 것 12개)
+지금 상태: 됨 7 · 일부 4 · 다음 0 · 열린 질문 12개(내가 정할 것 12개)
 
 ### 상황별 읽는 곳
 | 언제 | 여기만 읽기 | 안 읽어도 되는 것 |
@@ -59,7 +59,7 @@
 실행 방법 (비밀값은 각 폴더의 `.env.example`에 이름만 있음)
 - DB: `docker compose up -d`
 - 서버: `cd server` → `uv sync` → `uv run alembic upgrade head` → `uv run uvicorn app.main:app --reload`
-- 웹: `cd web` → `npm install` → `npm run dev`
+- 웹: `cd web` → `npm install` → `npm run dev` → http://localhost:5173 (서버가 떠 있어야 한다. 개발 서버가 `/api`를 `http://127.0.0.1:8000`으로 넘겨 준다. 계정은 앱에서 만든다)
 - 앱: `cd app` → `npm install` → `npx expo run:android` (JAVA_HOME은 Android Studio의 jbr 폴더). 계정 연결을 쓰려면 서버가 떠 있어야 한다. 에뮬레이터는 그대로 내 PC의 서버(8000번)를 보고, 실기기는 `app/.env`의 `EXPO_PUBLIC_API_URL`에 PC 주소를 적고 서버를 `--host 0.0.0.0`으로 띄운다
 - 테스트: 서버 `uv run pytest` · 앱 `npm test` · 웹 `npm test`
 

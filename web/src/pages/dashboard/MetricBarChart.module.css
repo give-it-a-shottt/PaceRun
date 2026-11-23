@@ -1,0 +1,31 @@
+.chart,
+.plot {
+  width: 100%;
+  height: 100%;
+}
+
+/* 가로 눈금 글자(피그마 Caption/Regular/12 · text/sub) */
+.chart :global(.recharts-cartesian-axis-tick-value) {
+  fill: var(--text-sub);
+  font: var(--type-caption-12r);
+  letter-spacing: var(--type-tracking);
+}
+
+/* 막대 위의 값(피그마 Caption/Medium/11 · text/main) */
+.chart :global(.recharts-label) {
+  fill: var(--text-main);
+  font: var(--type-caption-11m);
+  letter-spacing: var(--type-tracking);
+  font-variant-numeric: tabular-nums;
+}
+
+.tooltip {
+  padding: var(--space-1-5) var(--space-2);
+  border: var(--line-width) solid var(--line-black);
+  border-radius: var(--radius-tag);
+  background: var(--bg-default);
+  color: var(--text-main);
+  font: var(--type-caption-12m);
+  letter-spacing: var(--type-tracking);
+  white-space: nowrap;
+}

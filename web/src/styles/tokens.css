@@ -1,0 +1,104 @@
+/*
+ * 디자인 토큰. 값의 기준은 피그마 Pace-Run 파일의 변수이고 이름도 그대로 옮겼다(`text/main` → `--text-main`).
+ * 앱의 app/src/theme/tokens.ts와 같은 값이어야 한다. 값을 바꿀 때는 피그마와 pacerun-design.md를 먼저 바꾼다.
+ * 웹은 Light 테마만 쓴다(기획).
+ */
+:root {
+  /* 색 */
+  --text-main: #111111;
+  --text-sub: #424242;
+  --text-sub-weak: #757575;
+  --text-inverse: #ffffff;
+  --text-on-primary: #ffffff;
+
+  --icon-main: #212121;
+  --icon-sub: #616161;
+
+  --bg-default: #ffffff;
+  --bg-light: #fafafa;
+  --bg-regular: #f5f5f5;
+
+  --line-light: #eeeeee;
+  --line-regular: #e0e0e0;
+  --line-strong: #bdbdbd;
+  --line-black: #111111;
+
+  --primary-default: #76314b;
+  --primary-pressed: #542336;
+  --primary-soft: #f6eff2;
+
+  --sub1-base: #ffd43b;
+  --sub1-soft: #fffcef;
+
+  --lane-done: #76314b;
+
+  --badge-plum-text: #76314b;
+  --badge-plum-soft: #f6eff2;
+  --badge-black-text: #212121;
+  --badge-black-soft: #f2f2f2;
+  --badge-blue-text: #1e5bb8;
+  --badge-blue-soft: #e8f1fd;
+  --badge-green-text: #1b7a3a;
+  --badge-green-soft: #e8f5ec;
+
+  --status-error-base: #e5484d;
+  /* 피그마 화면에 오류 글자색 변수가 없어 앱과 같은 임시 값을 쓴다 */
+  --status-error-text: #b3261e;
+
+  /* 간격 */
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-1-5: 6px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-20: 80px;
+
+  /* 모서리 */
+  --radius-tag: 6px;
+  --radius-button: 8px;
+  --radius-input: 8px;
+  --radius-card: 16px;
+  --radius-full: 999px;
+
+  /* 그림자 (피그마 Shadow/1 · Shadow/2) */
+  --shadow-1: 0 1px 2px 0 #2121210f;
+  --shadow-2: 0 2px 4px 0 #21212114;
+
+  /* 선 굵기 */
+  --line-width: 1px;
+  --line-width-strong: 2px;
+
+  /* 글자: 피그마 텍스트 스타일 `KR/{묶음}/{굵기}/{크기}` → `--type-{묶음}-{크기}{굵기}`. font 속성에 그대로 넣는다. */
+  --font-family: 'Pretendard', system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  /* 피그마 자간 -2.5%. font를 쓰는 곳에서 letter-spacing으로 함께 준다(em이라 글자 크기를 따라간다) */
+  --type-tracking: -0.025em;
+  --type-display-32sb: 600 32px/42px var(--font-family);
+  --type-headline-28sb: 600 28px/39px var(--font-family);
+  --type-headline-24sb: 600 24px/34px var(--font-family);
+  --type-headline-20sb: 600 20px/28px var(--font-family);
+  --type-title-18sb: 600 18px/25px var(--font-family);
+  --type-title-16sb: 600 16px/22px var(--font-family);
+  --type-body-16r: 400 16px/22px var(--font-family);
+  --type-body-15r: 400 15px/22px var(--font-family);
+  --type-body-14r: 400 14px/20px var(--font-family);
+  --type-body-14m: 500 14px/20px var(--font-family);
+  --type-caption-13m: 500 13px/19px var(--font-family);
+  --type-caption-12r: 400 12px/17px var(--font-family);
+  --type-caption-12m: 500 12px/17px var(--font-family);
+  --type-caption-11m: 500 11px/16px var(--font-family);
+
+  /* 틀 (기획: PC 1440 기준 · Container 1200) */
+  --container-default: 1200px;
+  /* 대시보드 · 러닝 상세의 오른쪽 열(12칸 가운데 4칸) */
+  --layout-side-column: 384px;
+  --gnb-height: 64px;
+  /* 입력창 · 버튼 L */
+  --control-height-l: 48px;
+  --icon-button-size: 32px;
+}

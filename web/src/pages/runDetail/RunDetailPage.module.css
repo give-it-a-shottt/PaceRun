@@ -1,0 +1,223 @@
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: var(--type-body-14r);
+  letter-spacing: var(--type-tracking);
+}
+
+.breadcrumbLink {
+  color: var(--text-sub);
+}
+
+.breadcrumbLink:hover {
+  color: var(--text-main);
+  text-decoration: underline;
+}
+
+.breadcrumbCurrent {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-main);
+  font: var(--type-body-14m);
+}
+
+.breadcrumbCaret {
+  color: var(--icon-sub);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-6);
+}
+
+.titleBlock {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.title {
+  font: var(--type-display-32sb);
+  letter-spacing: var(--type-tracking);
+}
+
+.time {
+  color: var(--text-sub);
+  font: var(--type-body-14r);
+  letter-spacing: var(--type-tracking);
+}
+
+/* 같은 모드 지난번과의 비교 */
+.comparison {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  padding: var(--space-4) var(--space-5);
+  border: var(--line-width) solid var(--line-black);
+  border-radius: var(--radius-card);
+  background: var(--sub1-soft);
+}
+
+.comparisonText {
+  font: var(--type-title-16sb);
+  letter-spacing: var(--type-tracking);
+}
+
+.comparisonDetail {
+  color: var(--text-sub);
+  font: var(--type-caption-12r);
+  letter-spacing: var(--type-tracking);
+}
+
+/* 지도 8칸 + 지표 · 구간 표 4칸 */
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--layout-side-column);
+  align-items: start;
+  gap: var(--space-6);
+}
+
+.mapFrame {
+  /* 피그마 Route Map의 높이 */
+  --map-height: 520px;
+
+  display: flex;
+  flex-direction: column;
+  height: var(--map-height);
+  overflow: hidden;
+  border: var(--line-width) solid var(--line-regular);
+  border-radius: var(--radius-card);
+  background: var(--bg-regular);
+  /* leaflet의 z-index(최대 1000)가 이 틀 밖의 요소를 덮지 않게 가둔다 */
+  isolation: isolate;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+/* 목표처럼 긴 값은 칸 안에서 줄을 바꾼다 */
+.stats dd {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.note {
+  color: var(--text-sub);
+  font: var(--type-caption-12r);
+  letter-spacing: var(--type-tracking);
+}
+
+.segmentsTitle {
+  padding-bottom: var(--space-3);
+  font: var(--type-title-18sb);
+  letter-spacing: var(--type-tracking);
+}
+
+.segments {
+  /* 피그마 구간 표의 열 너비 */
+  --col-no: 40px;
+  --col-number: 64px;
+
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--type-body-14r);
+  letter-spacing: var(--type-tracking);
+}
+
+.segments td {
+  padding: var(--space-2) 0;
+  border-bottom: var(--line-width) solid var(--line-light);
+  color: var(--text-main);
+  text-align: left;
+}
+
+.segments .segmentNo {
+  width: var(--col-no);
+}
+
+.segments .segmentKind {
+  font: var(--type-body-14m);
+}
+
+.segments .segmentNumber {
+  width: var(--col-number);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 쉬어 가는 구간(걷기)은 이름을 옅게 */
+.segments .resting .segmentKind {
+  color: var(--text-sub);
+  font: var(--type-body-14r);
+}
+
+.notFound {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding-block: var(--space-12);
+  color: var(--text-sub);
+  font: var(--type-body-16r);
+  letter-spacing: var(--type-tracking);
+}
+
+.notFoundLink {
+  color: var(--text-main);
+  font: var(--type-body-14m);
+  text-decoration: underline;
+  text-underline-position: from-font;
+}
+
+/* 읽는 중 자리 잡기 */
+.skeletonBreadcrumb {
+  width: 6em;
+  height: 1lh;
+}
+
+.skeletonBadge {
+  width: 4em;
+  height: calc(1lh + var(--space-1) * 2);
+  font: var(--type-caption-12m);
+}
+
+.skeletonTitle {
+  width: 10em;
+  height: 1lh;
+  font: var(--type-display-32sb);
+}
+
+.skeletonTime {
+  width: 18em;
+  height: 1lh;
+  font: var(--type-body-14r);
+}
+
+.skeletonFill {
+  flex: 1;
+}
+
+/* 태블릿: 지도와 표가 위아래로 쌓인다 */
+@media (max-width: 1023px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

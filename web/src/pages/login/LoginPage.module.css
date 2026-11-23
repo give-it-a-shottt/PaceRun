@@ -1,0 +1,158 @@
+.page {
+  /* 피그마 로그인 카드 너비 */
+  --login-card-width: 440px;
+
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  background: var(--bg-light);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  width: 100%;
+  max-width: var(--login-card-width);
+  padding: var(--space-10);
+  border: var(--line-width) solid var(--line-regular);
+  border-radius: var(--radius-card);
+  background: var(--bg-default);
+  box-shadow: var(--shadow-2);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: var(--type-headline-24sb);
+  letter-spacing: var(--type-tracking);
+}
+
+.intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.title {
+  font: var(--type-headline-28sb);
+  letter-spacing: var(--type-tracking);
+}
+
+.description {
+  color: var(--text-sub);
+  font: var(--type-body-15r);
+  letter-spacing: var(--type-tracking);
+  word-break: keep-all;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.label {
+  font: var(--type-caption-13m);
+  letter-spacing: var(--type-tracking);
+}
+
+/* 피그마 Input: Filled 48 · Focus line/black 2px · Error status 테두리 */
+.input {
+  width: 100%;
+  height: var(--control-height-l);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-input);
+  outline: var(--line-width-strong) solid transparent;
+  outline-offset: calc(var(--line-width-strong) * -1);
+  background: var(--bg-regular);
+  color: var(--text-main);
+  font: var(--type-body-15r);
+  letter-spacing: var(--type-tracking);
+}
+
+.input[aria-invalid='true'] {
+  outline-color: var(--status-error-base);
+}
+
+.input:focus {
+  outline-color: var(--line-black);
+}
+
+.input:read-only {
+  color: var(--text-sub);
+}
+
+.fieldError,
+.formError {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1-5);
+  color: var(--status-error-text);
+  font: var(--type-caption-12r);
+  letter-spacing: var(--type-tracking);
+}
+
+.fieldErrorIcon {
+  flex-shrink: 0;
+  color: var(--status-error-base);
+}
+
+/* 피그마 Button Primary L */
+.submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  height: var(--control-height-l);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-button);
+  background: var(--primary-default);
+  color: var(--text-on-primary);
+  font: var(--type-title-16sb);
+  letter-spacing: var(--type-tracking);
+}
+
+.submit:hover,
+.submit:active {
+  background: var(--primary-pressed);
+}
+
+.submit:disabled {
+  background: var(--primary-pressed);
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: var(--text-sub);
+  font: var(--type-caption-12r);
+  letter-spacing: var(--type-tracking);
+}
+
+.noticeIcon {
+  flex-shrink: 0;
+  color: var(--icon-sub);
+}

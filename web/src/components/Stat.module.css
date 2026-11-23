@@ -1,0 +1,42 @@
+.stat {
+  display: flex;
+  flex: 1;
+  flex-direction: column-reverse;
+  gap: var(--space-0-5);
+  min-width: 0;
+}
+
+.value {
+  color: var(--text-main);
+  font: var(--type-headline-24sb);
+  letter-spacing: var(--type-tracking);
+  /* 피그마 Stat: 숫자는 tabular-nums */
+  font-variant-numeric: tabular-nums;
+}
+
+.label {
+  color: var(--text-sub);
+  font: var(--type-caption-12r);
+  letter-spacing: var(--type-tracking);
+}
+
+/* 읽는 중: 들어올 글자와 같은 줄 높이로 자리를 잡는다(1lh = 그 글자 모양의 줄 높이) */
+.statSkeleton {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  min-width: 0;
+}
+
+.valueSkeleton {
+  width: 60%;
+  height: 1lh;
+  font: var(--type-headline-24sb);
+}
+
+.labelSkeleton {
+  width: 30%;
+  height: 1lh;
+  font: var(--type-caption-12r);
+}

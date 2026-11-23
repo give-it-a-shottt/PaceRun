@@ -1,0 +1,85 @@
+.stepper {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-button-size);
+  height: var(--icon-button-size);
+  border: var(--line-width) solid var(--line-regular);
+  border-radius: var(--radius-button);
+  background: var(--bg-default);
+  color: var(--icon-main);
+}
+
+.step:hover:not(:disabled) {
+  border-color: var(--line-black);
+}
+
+.step:disabled {
+  background: var(--bg-regular);
+  color: var(--line-strong);
+}
+
+/* 피그마 Tab Line: 칸 80 × 44, 고른 칸 아래 line/black 2px */
+.tabLine {
+  --tab-width: 80px;
+  --tab-height: 44px;
+
+  display: flex;
+  flex-shrink: 0;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tab-width);
+  height: var(--tab-height);
+  border-bottom: var(--line-width) solid var(--line-regular);
+  color: var(--text-sub);
+  font: var(--type-body-16r);
+  letter-spacing: var(--type-tracking);
+}
+
+.tab:hover {
+  color: var(--text-main);
+}
+
+.tabActive {
+  border-bottom: var(--line-width-strong) solid var(--line-black);
+  color: var(--text-main);
+  font: var(--type-title-16sb);
+}
+
+.segmented {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-button);
+  background: var(--bg-regular);
+}
+
+.segment {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-button);
+  color: var(--text-sub);
+  font: var(--type-body-14r);
+  letter-spacing: var(--type-tracking);
+  white-space: nowrap;
+}
+
+.segment:hover {
+  color: var(--text-main);
+}
+
+.segmentActive {
+  background: var(--bg-default);
+  box-shadow: var(--shadow-1);
+  color: var(--text-main);
+  font: var(--type-body-14m);
+}

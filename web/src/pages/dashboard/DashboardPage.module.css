@@ -1,0 +1,90 @@
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-6);
+}
+
+.titleBlock {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.eyebrow {
+  /* 년 단위에서는 글자가 비지만 줄의 자리는 지킨다(월 ↔ 년을 바꿀 때 아래 내용이 오르내리지 않게) */
+  min-height: 1lh;
+  color: var(--text-sub);
+  font: var(--type-body-14r);
+  letter-spacing: var(--type-tracking);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.title {
+  font: var(--type-headline-28sb);
+  letter-spacing: var(--type-tracking);
+  white-space: nowrap;
+}
+
+/* 차트 8칸 + 요약 4칸 */
+.overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--layout-side-column);
+  align-items: start;
+  gap: var(--space-6);
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.cardTitle {
+  font: var(--type-title-18sb);
+  letter-spacing: var(--type-tracking);
+}
+
+.chartArea {
+  /* 피그마 Monthly Bar Chart의 높이 */
+  --chart-height: 300px;
+
+  display: flex;
+  flex-direction: column;
+  height: var(--chart-height);
+}
+
+/* "최근 러닝" 카드는 제목과 표 사이를 카드 기본 간격 대신 제목의 아래 여백으로 띄운다(피그마) */
+.recentTitle {
+  padding-bottom: var(--space-3);
+}
+
+/* 읽는 중 자리 잡기 */
+.skeletonTitle {
+  width: 6em;
+  height: 1lh;
+}
+
+.skeletonCardTitle {
+  width: 8em;
+  height: 1lh;
+}
+
+.skeletonFill {
+  flex: 1;
+}
+
+/* 태블릿: 차트와 요약 카드가 위아래로 쌓인다 */
+@media (max-width: 1023px) {
+  .overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
