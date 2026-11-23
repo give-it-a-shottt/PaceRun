@@ -1,6 +1,6 @@
 /** 화면에 쓰는 숫자 · 날짜 표현. 웹 전체가 이 함수들만 써서 표기를 하나로 맞춘다(앱과 같은 표기). */
 
-function pad2(n: number): string {
+export function pad2(n: number): string {
   return n < 10 ? `0${n}` : String(n);
 }
 
@@ -45,11 +45,13 @@ export function formatKm(meters: number): string {
   return `${Number.isInteger(km) ? km : km.toFixed(1)}km`;
 }
 
-/** 초 차이를 말로: 8 → "8초", 60 → "1분", 273 → "4분 33초" */
-export function formatGapSeconds(seconds: number): string {
-  if (seconds < 60) return `${seconds}초`;
-  const rest = seconds % 60;
-  return rest === 0 ? `${Math.floor(seconds / 60)}분` : `${Math.floor(seconds / 60)}분 ${rest}초`;
+/** 초를 말로: 8 → "8초", 60 → "1분", 273 → "4분 33초" (페이스 차이 · 목표 시간에 쓴다) */
+export function formatSecondsText(seconds: number): string {
+  const total = Math.max(0, Math.round(seconds));
+  const minutes = Math.floor(total / 60);
+  const rest = total % 60;
+  if (minutes === 0) return `${rest}초`;
+  return rest === 0 ? `${minutes}분` : `${minutes}분 ${rest}초`;
 }
 
 /** JS의 getDay() 순서(0 = 일요일) */

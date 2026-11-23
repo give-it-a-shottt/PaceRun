@@ -17,7 +17,8 @@ const FIT_PADDING = 40;
 /** 도착 표시를 출발 표시 위에 그린다(같은 자리에서 끝나는 러닝이 많다) */
 const FINISH_Z_INDEX_OFFSET = 100;
 
-const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+/** 하위 도메인(a · b · c) 없는 주소가 OpenStreetMap이 권하는 주소다 */
+const OSM_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 /** OpenStreetMap 타일을 쓰는 조건이다. 지우지 않는다. */
 const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 

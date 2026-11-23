@@ -11,7 +11,7 @@ npm run dev      # http://localhost:5173
 
 - API 서버가 떠 있어야 한다(`server/` — 기본 `http://127.0.0.1:8000`). 개발 서버가 `/api`로 온 요청을 그 주소로 넘겨 준다.
 - 서버를 다른 곳에 띄웠으면 `VITE_DEV_API_TARGET=http://주소:포트 npm run dev`.
-- 배포해서 API가 다른 주소에 있으면 빌드할 때 `VITE_API_URL`을 준다(그 서버의 `CORS_ORIGINS`에 이 사이트 주소를 넣어야 한다).
+- 배포해서 API가 다른 주소에 있으면 빌드할 때 `VITE_API_URL`을 준다(그 서버의 `CORS_ORIGINS`에 이 사이트 주소를 넣어야 한다). 로그인 쿠키가 SameSite=Lax라 사이트와 API가 같은 사이트(예: `app.example.com`과 `api.example.com`)여야 새로 고침 뒤에도 로그인이 유지된다.
 
 ## 확인
 

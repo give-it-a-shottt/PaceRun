@@ -30,6 +30,16 @@ describe('parseDashboardQuery', () => {
     expect(parse('?anchor=2026-12-01').anchor).toBe(TODAY);
     expect(parse('?anchor=2026-11-01').anchor).toBe('2026-11-01');
   });
+
+  it('서버가 받는 가장 이른 날짜보다 앞이면 그 날짜로 본다', () => {
+    expect(parse('?anchor=1999-12-31').anchor).toBe('2000-01-01');
+    expect(parse('?period=year&anchor=1987-06-15').anchor).toBe('2000-01-01');
+  });
+
+  it('가장 이른 날짜와 그 바로 뒤는 그대로 읽는다', () => {
+    expect(parse('?anchor=2000-01-01').anchor).toBe('2000-01-01');
+    expect(parse('?anchor=2000-01-02').anchor).toBe('2000-01-02');
+  });
 });
 
 describe('toDashboardSearch', () => {

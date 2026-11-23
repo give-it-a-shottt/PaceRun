@@ -9,6 +9,7 @@ import {
   logOut,
   resetSessionForTest,
   restoreSession,
+  retryRestoreSession,
   SessionExpiredError,
   subscribeSession,
 } from './session';
@@ -78,10 +79,46 @@ describe('사이트를 열 때', () => {
     expect(getSessionState()).toEqual({ status: 'signedOut', user: null });
   });
 
-  it('서버에 닿지 못해도 로그인 안 된 상태로 연다', async () => {
+  it('서버에 닿지 못하면 "로그인 안 됨"이 아니라 "닿지 못함"으로 연다(쿠키가 살아 있을 수 있다)', async () => {
+    fetchMock.mockRejectedValue(new TypeError('failed to fetch'));
+    await expect(restoreSession()).resolves.toBeUndefined();
+    expect(getSessionState()).toEqual({ status: 'unreachable', user: null });
+  });
+
+  it('닿지 못한 뒤 다시 시도하면 읽는 중을 거쳐 로그인된다', async () => {
     fetchMock.mockRejectedValue(new TypeError('failed to fetch'));
     await restoreSession();
+    serve({ '/auth/refresh': [{ status: 200, body: token(1) }], '/me': [{ status: 200, body: user }] });
+    const seen: string[] = [];
+    subscribeSession(() => seen.push(getSessionState().status));
+
+    await retryRestoreSession();
+
+    expect(seen).toEqual(['loading', 'signedIn']);
+  });
+
+  it('토큰은 받았는데 내 정보를 읽다 서버 오류가 나면 "닿지 못함"이다. 서버가 거절(401)하면 로그인 안 됨이다', async () => {
+    serve({ '/auth/refresh': [{ status: 200, body: token(1) }], '/me': [{ status: 500, body: { detail: { code: 'INTERNAL', message: '오류' } } }] });
+    await restoreSession();
+    expect(getSessionState().status).toBe('unreachable');
+
+    resetSessionForTest();
+    serve({ '/auth/refresh': [{ status: 200, body: token(1) }], '/me': [unauthorized] });
+    await restoreSession();
     expect(getSessionState().status).toBe('signedOut');
+  });
+
+  it('쿠키 갱신이 한 번 401이어도 잠깐 뒤에 다시 해 본다(다른 탭이 방금 같은 쿠키로 갱신한 경우)', async () => {
+    serve({
+      '/auth/refresh': [{ status: 401, body: { detail: { code: 'INVALID_REFRESH', message: '방금 쓴 쿠키' } } }, { status: 200, body: token(2) }],
+      '/me': [{ status: 200, body: user }],
+    });
+
+    await restoreSession();
+
+    expect(getSessionState().status).toBe('signedIn');
+    expect(callsTo('/auth/refresh')).toHaveLength(2);
+    expect(callsTo('/me')[0][1].headers.Authorization).toBe('Bearer access-2');
   });
 
   it('여러 번 불러도 한 번만 다녀온다', async () => {
@@ -100,7 +137,7 @@ describe('사이트를 열 때', () => {
 
     unsubscribe();
     serve({ '/auth/logout': [{ status: 204 }] });
-    await logOut();
+    expect(await logOut()).toBe(true);
     expect(listener).toHaveBeenCalledTimes(1);
   });
 });
@@ -134,16 +171,32 @@ describe('로그인 · 로그아웃', () => {
     await expect(logIn(user.email, 'password1')).rejects.toBeInstanceOf(NetworkError);
   });
 
-  it('로그아웃하면 서버에 쿠키 폐기를 알리고 로그인 안 된 상태가 된다. 서버에 닿지 못해도 그렇다', async () => {
+  it('로그아웃하면 서버에 쿠키 폐기를 알리고 로그인 안 된 상태가 된다', async () => {
     serve({ '/auth/login': [{ status: 200, body: { ...token(1), user } }], '/auth/logout': [{ status: 204 }] });
     await logIn(user.email, 'password1');
 
-    await logOut();
+    expect(await logOut()).toBe(true);
+
     expect(getSessionState()).toEqual({ status: 'signedOut', user: null });
     expect(callsTo('/auth/logout')[0][1].credentials).toBe('include');
+  });
 
+  it('서버에 닿지 못하면 로그아웃하지 못한 것이다(쿠키가 남아 다시 로그인되므로 로그인된 채로 두고 false)', async () => {
+    serve({ '/auth/login': [{ status: 200, body: { ...token(1), user } }] });
+    await logIn(user.email, 'password1');
     fetchMock.mockRejectedValue(new TypeError('failed to fetch'));
-    await expect(logOut()).resolves.toBeUndefined();
+
+    expect(await logOut()).toBe(false);
+
+    expect(getSessionState()).toEqual({ status: 'signedIn', user });
+  });
+
+  it('서버가 로그아웃 요청을 거절(4xx)하면 쿠키가 이미 쓸모없는 것이라 로그아웃으로 본다', async () => {
+    serve({ '/auth/login': [{ status: 200, body: { ...token(1), user } }], '/auth/logout': [unauthorized] });
+    await logIn(user.email, 'password1');
+
+    expect(await logOut()).toBe(true);
+    expect(getSessionState().status).toBe('signedOut');
   });
 });
 

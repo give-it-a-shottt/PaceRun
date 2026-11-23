@@ -48,38 +48,17 @@
   min-width: 0;
 }
 
-.cardTitle {
-  font: var(--type-title-18sb);
-  letter-spacing: var(--type-tracking);
-}
-
-.chartArea {
-  /* 피그마 Monthly Bar Chart의 높이 */
-  --chart-height: 300px;
-
-  display: flex;
-  flex-direction: column;
-  height: var(--chart-height);
-}
-
 /* "최근 러닝" 카드는 제목과 표 사이를 카드 기본 간격 대신 제목의 아래 여백으로 띄운다(피그마) */
 .recentTitle {
   padding-bottom: var(--space-3);
+  font: var(--type-title-18sb);
+  letter-spacing: var(--type-tracking);
 }
 
 /* 읽는 중 자리 잡기 */
 .skeletonTitle {
   width: 6em;
   height: 1lh;
-}
-
-.skeletonCardTitle {
-  width: 8em;
-  height: 1lh;
-}
-
-.skeletonFill {
-  flex: 1;
 }
 
 /* 태블릿: 차트와 요약 카드가 위아래로 쌓인다 */

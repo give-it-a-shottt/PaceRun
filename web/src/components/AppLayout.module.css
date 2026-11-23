@@ -65,10 +65,12 @@
 }
 
 .account {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-4);
   min-width: 0;
+  height: 100%;
   margin-left: auto;
   font: var(--type-body-14r);
   letter-spacing: var(--type-tracking);
@@ -90,6 +92,22 @@
 
 .logOut:disabled {
   color: var(--text-sub-weak);
+}
+
+/* 로그아웃 실패 안내: GNB 바로 아래(본문 위 여백)에 띄워서 GNB와 본문의 자리를 밀지 않는다 */
+.logOutError {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  z-index: 1;
+  padding: var(--space-1) var(--space-2);
+  border: var(--line-width) solid var(--status-error-base);
+  border-radius: var(--radius-tag);
+  background: var(--bg-default);
+  color: var(--status-error-text);
+  font: var(--type-caption-12r);
+  letter-spacing: var(--type-tracking);
+  white-space: nowrap;
 }
 
 .main {

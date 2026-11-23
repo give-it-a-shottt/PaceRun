@@ -1,0 +1,23 @@
+.title {
+  font: var(--type-title-18sb);
+  letter-spacing: var(--type-tracking);
+}
+
+.area {
+  /* 피그마 Monthly Bar Chart의 높이 */
+  --chart-height: 300px;
+
+  display: flex;
+  flex-direction: column;
+  height: var(--chart-height);
+}
+
+/* 읽는 중 자리 잡기 */
+.skeletonTitle {
+  width: 8em;
+  height: 1lh;
+}
+
+.skeletonFill {
+  flex: 1;
+}

@@ -6,12 +6,10 @@ import { LoadError, LoadingText, Skeleton } from '../../components/LoadState';
 import { Stat, StatSkeleton } from '../../components/Stat';
 import type { DashboardView } from '../../domain/dashboard';
 import type { GoalWeeksView } from '../../domain/weeks';
+import type { CardState } from './cardState';
 import styles from './SummaryCards.module.css';
 
 const SMALL_ICON_SIZE = 16;
-
-/** 카드 하나가 그릴 값의 상태: 읽는 중 · 실패 · 준비됨 */
-export type CardState<T> = { status: 'loading' } | { status: 'failed'; retry: () => void } | { status: 'ready'; value: T };
 
 type SummaryCardProps<T> = {
   /** 값을 읽기 전에도 보이는 카드 이름. 값에서 나오는 이름이면 null(읽는 중에는 자리만 잡는다) */

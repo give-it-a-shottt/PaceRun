@@ -1,7 +1,14 @@
 import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { isCurrentPeriod, METRIC_LABELS, PERIOD_LABELS, shiftAnchor, type Metric } from '../../domain/dashboard';
+import {
+  canShiftBack,
+  isCurrentPeriod,
+  METRIC_LABELS,
+  PERIOD_LABELS,
+  shiftAnchor,
+  type Metric,
+} from '../../domain/dashboard';
 import type { StatsPeriod } from '../../domain/types';
 import { toDashboardSearch, type DashboardQuery } from './dashboardQuery';
 import styles from './DashboardControls.module.css';
@@ -17,7 +24,10 @@ const STEP_LABELS: Record<StatsPeriod, { previous: string; next: string }> = {
 
 type ControlProps = { query: DashboardQuery; today: string };
 
-/** 앞 · 뒤 기간으로 옮기는 꺾쇠 버튼 두 개. 오늘이 든 기간에서는 "다음"을 막는다. */
+/**
+ * 앞 · 뒤 기간으로 옮기는 꺾쇠 버튼 두 개.
+ * 오늘이 든 기간에서는 "다음"을, 서버가 받는 가장 이른 기간에서는 "이전"을 막는다.
+ */
 export function PeriodStepper({ query, today }: ControlProps) {
   const navigate = useNavigate();
   const labels = STEP_LABELS[query.period];
@@ -32,6 +42,7 @@ export function PeriodStepper({ query, today }: ControlProps) {
         type="button"
         className={styles.step}
         onClick={() => step(-1)}
+        disabled={!canShiftBack(query.period, query.anchor)}
         aria-label={labels.previous}
         title={labels.previous}
       >

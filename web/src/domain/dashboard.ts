@@ -1,5 +1,5 @@
 /** 대시보드(WEB_01_002)에 그릴 값: 기간 제목 · 막대 차트 · 합계 · 평균 페이스. 화면은 이 결과를 그리기만 한다. */
-import { formatGapSeconds, formatHoursMinutes, formatKmOneDecimal, formatPace } from './format';
+import { formatHoursMinutes, formatKmOneDecimal, formatPace, formatSecondsText, pad2 } from './format';
 import type { Stats, StatsPeriod } from './types';
 
 export type Metric = 'distance' | 'count' | 'time';
@@ -17,8 +17,7 @@ const DAY_LABEL_STEP = 5;
 
 /** "YYYY-MM-DD" (그 사람이 있는 곳의 날짜) */
 export function toDateText(date: Date): string {
-  const pad = (n: number) => (n < 10 ? `0${n}` : String(n));
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
 }
 
 function parseDateText(text: string): { year: number; month: number; day: number } {
@@ -32,6 +31,21 @@ export function shiftAnchor(period: StatsPeriod, anchor: string, direction: 1 | 
   // Date가 달 · 해 넘김을 알아서 처리한다(13월 → 다음 해 1월)
   const moved = period === 'month' ? new Date(year, month - 1 + direction, 1) : new Date(year + direction, 0, 1);
   return toDateText(moved);
+}
+
+/** 서버가 받는 가장 이른 기준 날짜(api-list.md "통계"). 이보다 앞은 422다. */
+export const MIN_ANCHOR = '2000-01-01';
+
+/** 앞 기간으로 더 갈 수 있는가(서버가 받는 가장 이른 날짜보다 앞으로는 가지 않는다) */
+export function canShiftBack(period: StatsPeriod, anchor: string): boolean {
+  // "YYYY-MM-DD"는 글자 순서가 날짜 순서와 같다
+  return shiftAnchor(period, anchor, -1) >= MIN_ANCHOR;
+}
+
+/** 기준 날짜를 서버가 받는 범위(가장 이른 날짜 ~ 오늘) 안으로 맞춘다 */
+export function clampAnchor(anchor: string, today: string): string {
+  if (anchor > today) return today;
+  return anchor < MIN_ANCHOR ? MIN_ANCHOR : anchor;
 }
 
 /** 기준 날짜가 든 기간이 오늘이 든 기간인가(다음 기간으로 넘기는 버튼을 막는 데 쓴다) */
@@ -107,8 +121,8 @@ function paceComparison(
   if (previous == null) return { paceNote: `${before} 기록이 없어 비교하지 않았어요`, paceTrend: null };
   // 페이스는 km당 초라서 값이 작을수록 빠르다
   const faster = Math.round(previous - current);
-  if (faster > 0) return { paceNote: `${before}보다 ${formatGapSeconds(faster)} 빨라졌어요`, paceTrend: 'faster' };
-  if (faster < 0) return { paceNote: `${before}보다 ${formatGapSeconds(-faster)} 느려졌어요`, paceTrend: 'slower' };
+  if (faster > 0) return { paceNote: `${before}보다 ${formatSecondsText(faster)} 빨라졌어요`, paceTrend: 'faster' };
+  if (faster < 0) return { paceNote: `${before}보다 ${formatSecondsText(-faster)} 느려졌어요`, paceTrend: 'slower' };
   return { paceNote: `${before}과 같은 페이스예요`, paceTrend: null };
 }
 
@@ -138,6 +152,8 @@ export function describeDashboard({ stats, previous, metric, today }: DashboardI
   });
 
   const pace = averagePace(stats.totals);
+  // 이 기간의 페이스는 있는데 앞 기간을 아직 받지 못했으면 비교 문구를 비워 둔다("기록이 없어"라고 잘못 말하지 않게)
+  const previousStillLoading = pace != null && previous == null;
   const chartTitle = `${isMonth ? '일별' : '월별'} ${METRIC_LABELS[metric]} (${METRIC_UNITS[metric]})`;
   return {
     eyebrow: isMonth ? `${year}년` : '',
@@ -153,10 +169,9 @@ export function describeDashboard({ stats, previous, metric, today }: DashboardI
       { label: '시간', value: formatHoursMinutes(stats.totals.elapsed_s) },
     ],
     paceText: `${formatPace(pace)}/km`,
-    // 앞 기간을 아직 받지 못했으면 비교 문구를 비워 둔다("기록이 없어"라고 잘못 말하지 않게)
-    ...(previous || pace == null
-      ? paceComparison(stats.period, pace, previous ? averagePace(previous.totals) : null)
-      : { paceNote: '', paceTrend: null }),
+    ...(previousStillLoading
+      ? { paceNote: '', paceTrend: null }
+      : paceComparison(stats.period, pace, previous ? averagePace(previous.totals) : null)),
     goalWeeksText: `이 기간 ${stats.goal_weeks.total}주 가운데 ${stats.goal_weeks.achieved}주 달성`,
   };
 }

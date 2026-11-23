@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Link, NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 
 import { logOut } from '../api/session';
 import { useSession } from '../app/useSession';
 import logoMark from '../assets/logo-mark.svg';
 import styles from './AppLayout.module.css';
+import { ErrorBoundary } from './ErrorBoundary';
 
 /** 기획: 웹 헤더의 로고 32 */
 const LOGO_SIZE = 32;
@@ -16,12 +17,15 @@ function tabClassName({ isActive }: { isActive: boolean }): string {
 /** 로그인한 화면의 공통 틀: 위 GNB · 가운데 1200 컨테이너 · 아래 Footer */
 export function AppLayout() {
   const session = useSession();
-  const [loggingOut, setLoggingOut] = useState(false);
+  const location = useLocation();
+  const [logOutStatus, setLogOutStatus] = useState<'idle' | 'pending' | 'failed'>('idle');
 
-  // logOut은 던지지 않는다. 끝나면 상태가 signedOut이 되어 로그인 화면으로 간다(app/guards.tsx).
-  const handleLogOut = () => {
-    setLoggingOut(true);
-    void logOut();
+  // logOut은 던지지 않는다. 되면 상태가 signedOut이 되어 로그인 화면으로 간다(app/guards.tsx).
+  // 서버에 닿지 못하면 로그인된 채로 남으므로, 알리고 다시 누를 수 있게 한다.
+  const handleLogOut = async () => {
+    setLogOutStatus('pending');
+    const loggedOut = await logOut();
+    if (!loggedOut) setLogOutStatus('failed');
   };
 
   return (
@@ -43,14 +47,27 @@ export function AppLayout() {
           </nav>
           <div className={styles.account}>
             <span className={styles.email}>{session.user?.email}</span>
-            <button type="button" className={styles.logOut} onClick={handleLogOut} disabled={loggingOut}>
+            <button
+              type="button"
+              className={styles.logOut}
+              onClick={handleLogOut}
+              disabled={logOutStatus === 'pending'}
+            >
               로그아웃
             </button>
+            {logOutStatus === 'failed' && (
+              <p className={styles.logOutError} role="alert">
+                로그아웃하지 못했어요. 서버에 연결되면 다시 시도해 주세요
+              </p>
+            )}
           </div>
         </div>
       </header>
       <main className={styles.main}>
-        <Outlet />
+        {/* 화면 하나가 그리다 실패해도 GNB는 남는다. key: 다른 주소로 옮기면 경계를 새로 시작한다. */}
+        <ErrorBoundary key={location.pathname}>
+          <Outlet />
+        </ErrorBoundary>
       </main>
       <footer className={styles.footer}>
         <p className={styles.footerInner}>© Pace Run</p>

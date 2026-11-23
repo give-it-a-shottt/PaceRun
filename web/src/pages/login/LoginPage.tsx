@@ -1,5 +1,5 @@
 import { CircleNotchIcon, InfoIcon, WarningIcon } from '@phosphor-icons/react';
-import { useId, useRef, useState, type FormEvent } from 'react';
+import { useId, useRef, useState, type ComponentProps, type FormEvent, type RefObject } from 'react';
 
 import { ApiError, NetworkError } from '../../api/client';
 import { logIn } from '../../api/session';
@@ -33,6 +33,35 @@ function FieldError({ id, message }: { id: string; message: string }) {
   );
 }
 
+type LoginFieldProps = {
+  label: string;
+  /** 이 칸의 오류 문구. 없으면 undefined */
+  error: string | undefined;
+  inputRef: RefObject<HTMLInputElement | null>;
+} & Omit<ComponentProps<'input'>, 'id' | 'className' | 'aria-invalid' | 'aria-describedby'>;
+
+/** 입력 칸 하나: 라벨 + 입력창 + 오류 문구(피그마 Input). 오류는 입력창과 이어져 읽힌다. */
+function LoginField({ label, error, inputRef, ...input }: LoginFieldProps) {
+  const id = useId();
+  const errorId = `${id}-error`;
+  return (
+    <div className={styles.field}>
+      <label htmlFor={id} className={styles.label}>
+        {label}
+      </label>
+      <input
+        ref={inputRef}
+        id={id}
+        className={styles.input}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
+        {...input}
+      />
+      {error && <FieldError id={errorId} message={error} />}
+    </div>
+  );
+}
+
 /** WEB_01_001 로그인. 가입은 앱에서만 한다(아래 안내 문구). */
 export function LoginPage() {
   const [email, setEmail] = useState('');
@@ -41,11 +70,7 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
-  const id = useId();
-  const emailId = `${id}-email`;
-  const passwordId = `${id}-password`;
-  const emailErrorId = `${id}-email-error`;
-  const passwordErrorId = `${id}-password-error`;
+  const titleId = useId();
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -71,67 +96,51 @@ export function LoginPage() {
 
   return (
     <main className={styles.page}>
-      <form className={styles.card} onSubmit={handleSubmit} noValidate aria-labelledby={`${id}-title`}>
+      <form className={styles.card} onSubmit={handleSubmit} noValidate aria-labelledby={titleId}>
         <div className={styles.brand}>
           <img src={logoMark} alt="" width={LOGO_SIZE} height={LOGO_SIZE} />
           <span>Pace Run</span>
         </div>
 
         <div className={styles.intro}>
-          <h1 id={`${id}-title`} className={styles.title}>
+          <h1 id={titleId} className={styles.title}>
             로그인
           </h1>
           <p className={styles.description}>앱에서 계정을 연결한 이메일로 로그인하면 기록을 크게 볼 수 있어요.</p>
         </div>
 
-        <div className={styles.field}>
-          <label htmlFor={emailId} className={styles.label}>
-            이메일
-          </label>
-          <input
-            ref={emailRef}
-            id={emailId}
-            className={styles.input}
-            type="email"
-            name="email"
-            autoComplete="email"
-            inputMode="email"
-            autoCapitalize="none"
-            spellCheck={false}
-            value={email}
-            onChange={(event) => {
-              setEmail(event.target.value);
-              if (errors.email) setErrors({ ...errors, email: undefined });
-            }}
-            aria-invalid={errors.email ? true : undefined}
-            aria-describedby={errors.email ? emailErrorId : undefined}
-            readOnly={submitting}
-          />
-          {errors.email && <FieldError id={emailErrorId} message={errors.email} />}
-        </div>
+        <LoginField
+          label="이메일"
+          error={errors.email}
+          inputRef={emailRef}
+          type="email"
+          name="email"
+          autoComplete="email"
+          inputMode="email"
+          autoCapitalize="none"
+          spellCheck={false}
+          value={email}
+          onChange={(event) => {
+            setEmail(event.target.value);
+            if (errors.email) setErrors({ ...errors, email: undefined });
+          }}
+          readOnly={submitting}
+        />
 
-        <div className={styles.field}>
-          <label htmlFor={passwordId} className={styles.label}>
-            비밀번호
-          </label>
-          <input
-            ref={passwordRef}
-            id={passwordId}
-            className={styles.input}
-            type="password"
-            name="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => {
-              setPassword(event.target.value);
-              if (errors.password) setErrors({ ...errors, password: undefined });
-            }}
-            aria-invalid={errors.password ? true : undefined}
-            aria-describedby={errors.password ? passwordErrorId : undefined}
-            readOnly={submitting}
-          />
-          {errors.password && <FieldError id={passwordErrorId} message={errors.password} />}
-        </div>
+        <LoginField
+          label="비밀번호"
+          error={errors.password}
+          inputRef={passwordRef}
+          type="password"
+          name="password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(event) => {
+            setPassword(event.target.value);
+            if (errors.password) setErrors({ ...errors, password: undefined });
+          }}
+          readOnly={submitting}
+        />
 
         {errors.form && (
           <p className={styles.formError} role="alert">

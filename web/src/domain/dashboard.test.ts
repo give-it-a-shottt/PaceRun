@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { describeDashboard, isCurrentPeriod, shiftAnchor, toDateText } from './dashboard';
+import { canShiftBack, clampAnchor, describeDashboard, isCurrentPeriod, MIN_ANCHOR, shiftAnchor, toDateText } from './dashboard';
 import type { Stats, StatsBucket } from './types';
 
 function monthStats(overrides: Partial<Stats> = {}, days: Record<number, Partial<StatsBucket>> = {}): Stats {
@@ -59,6 +59,20 @@ describe('기간 옮기기', () => {
     expect(isCurrentPeriod('month', '2025-11-01', TODAY)).toBe(false);
     expect(isCurrentPeriod('year', '2026-01-01', TODAY)).toBe(true);
     expect(isCurrentPeriod('year', '2025-01-01', TODAY)).toBe(false);
+  });
+
+  it('서버가 받는 가장 이른 날짜(2000-01-01)보다 앞으로는 가지 않는다', () => {
+    expect(MIN_ANCHOR).toBe('2000-01-01');
+    expect(canShiftBack('month', '2000-02-10')).toBe(true);
+    expect(canShiftBack('month', '2000-01-31')).toBe(false);
+    expect(canShiftBack('year', '2001-06-01')).toBe(true);
+    expect(canShiftBack('year', '2000-06-01')).toBe(false);
+  });
+
+  it('기준 날짜를 받는 범위 안으로 맞춘다', () => {
+    expect(clampAnchor('2030-01-01', TODAY)).toBe(TODAY);
+    expect(clampAnchor('1999-12-31', TODAY)).toBe('2000-01-01');
+    expect(clampAnchor('2026-10-05', TODAY)).toBe('2026-10-05');
   });
 
   it('날짜를 그 사람이 있는 곳의 날짜로 적는다', () => {

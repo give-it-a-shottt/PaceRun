@@ -23,20 +23,27 @@ export function fetchRun(id: string): Promise<RunDetail> {
   return authorizedGet<RunDetail>(`/runs/${encodeURIComponent(id)}`);
 }
 
+/** 러닝 목록을 최신순으로 한 쪽씩 넘긴다. 받는 쪽이 그만 읽으면(반복을 빠져나가면) 다음 쪽을 요청하지 않는다. */
+async function* runPages(): AsyncGenerator<RunSummary[]> {
+  let cursor: string | null = null;
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const list: RunList = await fetchRunsPage(cursor, MAX_PAGE_SIZE);
+    yield list.items;
+    if (!list.next_cursor) return;
+    cursor = list.next_cursor;
+  }
+}
+
 /**
  * 그 시각 뒤에 시작한 러닝을 모두 읽는다(주 목표 카드용). 목록은 최신순이라, 그 시각보다 앞선 러닝이 나오면 멈춘다.
  */
 export async function fetchRunsSince(sinceMs: number): Promise<RunSummary[]> {
   const runs: RunSummary[] = [];
-  let cursor: string | null = null;
-  for (let page = 0; page < MAX_PAGES; page++) {
-    const list: RunList = await fetchRunsPage(cursor, MAX_PAGE_SIZE);
-    for (const run of list.items) {
+  for await (const items of runPages()) {
+    for (const run of items) {
       if (Date.parse(run.started_at) < sinceMs) return runs;
       runs.push(run);
     }
-    if (!list.next_cursor) return runs;
-    cursor = list.next_cursor;
   }
   return runs;
 }
@@ -46,14 +53,10 @@ export async function fetchRunsSince(sinceMs: number): Promise<RunSummary[]> {
  * 없으면 null.
  */
 export async function fetchPreviousComparable(run: RunSummary): Promise<RunSummary | null> {
-  let cursor: string | null = null;
-  for (let page = 0; page < MAX_PAGES; page++) {
-    const list: RunList = await fetchRunsPage(cursor, MAX_PAGE_SIZE);
+  for await (const items of runPages()) {
     // 한 쪽 안에서는 가장 최근 것이 답이다. 쪽은 최신순이므로 앞쪽에서 찾으면 뒤쪽을 볼 필요가 없다.
-    const found = previousComparable(run, list.items);
+    const found = previousComparable(run, items);
     if (found) return found;
-    if (!list.next_cursor) return null;
-    cursor = list.next_cursor;
   }
   return null;
 }

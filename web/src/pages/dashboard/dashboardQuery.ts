@@ -1,5 +1,5 @@
 /** 대시보드의 상태(기간 단위 · 기준 날짜 · 그릴 값)를 주소의 쿼리와 주고받는다. 새로 고침 · 뒤로 가기에 남게 하려는 것이다. */
-import { isCurrentPeriod, type Metric } from '../../domain/dashboard';
+import { clampAnchor, isCurrentPeriod, type Metric } from '../../domain/dashboard';
 import type { StatsPeriod } from '../../domain/types';
 
 export type DashboardQuery = { period: StatsPeriod; anchor: string; metric: Metric };
@@ -27,7 +27,8 @@ function isDateText(value: string | null): value is string {
 
 /**
  * 쿼리를 읽는다. 없거나 모르는 값이면 기본값(이번 달 · 거리)으로 본다.
- * 오늘보다 뒤의 날짜는 오늘로 본다(아직 오지 않은 기간은 보여 줄 것이 없다).
+ * 기준 날짜는 서버가 받는 범위 안으로 맞춘다: 오늘보다 뒤면 오늘(아직 오지 않은 기간은 보여 줄 것이 없다),
+ * 가장 이른 날짜(2000-01-01)보다 앞이면 그 날짜.
  */
 export function parseDashboardQuery(params: URLSearchParams, today: string): DashboardQuery {
   const period = params.get('period');
@@ -35,8 +36,7 @@ export function parseDashboardQuery(params: URLSearchParams, today: string): Das
   const anchor = params.get('anchor');
   return {
     period: isPeriod(period) ? period : DEFAULT_PERIOD,
-    // "YYYY-MM-DD"는 글자 순서가 날짜 순서와 같다
-    anchor: isDateText(anchor) && anchor <= today ? anchor : today,
+    anchor: isDateText(anchor) ? clampAnchor(anchor, today) : today,
     metric: isMetric(metric) ? metric : DEFAULT_METRIC,
   };
 }

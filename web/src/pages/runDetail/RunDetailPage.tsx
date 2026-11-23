@@ -1,12 +1,13 @@
 import { CaretRightIcon } from '@phosphor-icons/react';
 import { skipToken, useQuery } from '@tanstack/react-query';
-import { lazy, Suspense, useId } from 'react';
+import { Suspense, useId } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
-import { ApiError } from '../../api/client';
 import { fetchPreviousComparable, fetchRun } from '../../api/runs';
-import { hasFailed } from '../../app/queryClient';
+import { createLazyPart } from '../../app/lazyPart';
+import { hasFailed, isNotFound } from '../../app/queryClient';
 import { Card } from '../../components/Card';
+import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { EmptyText, LoadError, LoadingText, Skeleton } from '../../components/LoadState';
 import { ModeBadge } from '../../components/ModeBadge';
 import { Stat, StatSkeleton } from '../../components/Stat';
@@ -14,18 +15,11 @@ import { describeRunDetail, type RunDetailView } from '../../domain/runView';
 import styles from './RunDetailPage.module.css';
 
 // 지도 라이브러리(leaflet)는 이 화면에서만 쓴다. 경로를 그릴 때 따로 불러온다.
-const RouteMap = lazy(() => import('./RouteMap'));
+const { Part: RouteMap, retry: reloadRouteMap } = createLazyPart(() => import('./RouteMap'));
 
 const BREADCRUMB_ICON_SIZE = 16;
-/** 지표 카드의 칸 수(거리 · 시간 · 평균 페이스 · 목표) — 읽는 중 자리 잡기용 */
-const STAT_COUNT = 4;
-const HTTP_NOT_FOUND = 404;
-/** 주소의 id가 서버가 받는 모양(UUID)이 아닐 때. 그런 기록은 없는 것이므로 404와 같이 다룬다. */
-const HTTP_UNPROCESSABLE = 422;
-
-function isNotFound(error: unknown): boolean {
-  return error instanceof ApiError && (error.status === HTTP_NOT_FOUND || error.status === HTTP_UNPROCESSABLE);
-}
+/** 지표 카드의 칸 수(거리 · 시간 · 평균 페이스) — 읽는 중에 같은 수만큼 자리를 잡아 둔다 */
+const STAT_COUNT = 3;
 
 /** current: 마지막 칸의 글자. 아직 읽는 중이면 pending으로 자리만 잡고, 둘 다 없으면 "기록"만 보여 준다. */
 function Breadcrumb({ current, pending }: { current?: string; pending?: boolean }) {
@@ -79,6 +73,19 @@ function SegmentsCard({ segments }: { segments: RunDetailView['segments'] }) {
   );
 }
 
+/** 지도 자리에 들어갈 것: 경로가 있으면 지도, 없으면 안내 */
+function RouteArea({ path }: { path: RunDetailView['path'] }) {
+  if (path.length === 0) return <EmptyText>이 러닝에는 경로 기록이 없어요</EmptyText>;
+  return (
+    // 지도 조각을 받지 못하거나 그리다 예외가 나도 이 자리만 안내로 바뀐다
+    <ErrorBoundary onRetryPart={reloadRouteMap}>
+      <Suspense fallback={<Skeleton className={styles.skeletonFill} />}>
+        <RouteMap path={path} />
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
+
 function RunDetailContent({ view }: { view: RunDetailView }) {
   return (
     <>
@@ -99,13 +106,7 @@ function RunDetailContent({ view }: { view: RunDetailView }) {
 
       <div className={styles.body}>
         <div className={styles.mapFrame}>
-          {view.path.length > 0 ? (
-            <Suspense fallback={<Skeleton className={styles.skeletonFill} />}>
-              <RouteMap path={view.path} />
-            </Suspense>
-          ) : (
-            <EmptyText>이 러닝에는 경로 기록이 없어요</EmptyText>
-          )}
+          <RouteArea path={view.path} />
         </div>
 
         <div className={styles.side}>

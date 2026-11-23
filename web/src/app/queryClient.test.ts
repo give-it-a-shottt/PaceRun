@@ -2,7 +2,17 @@ import { describe, expect, it } from 'vitest';
 
 import { ApiError, NetworkError } from '../api/client';
 import { SessionExpiredError } from '../api/session';
-import { isShownFailure, shouldRetry } from './queryClient';
+import { isNotFound, isShownFailure, shouldRetry } from './queryClient';
+
+describe('없는 기록인지', () => {
+  it('404와 422(번호의 모양이 틀림)는 없는 기록이다. 그 밖의 실패는 아니다', () => {
+    expect(isNotFound(new ApiError(404, 'RUN_NOT_FOUND', '없음'))).toBe(true);
+    expect(isNotFound(new ApiError(422, 'VALIDATION', '틀림'))).toBe(true);
+    expect(isNotFound(new ApiError(500, 'INTERNAL', '오류'))).toBe(false);
+    expect(isNotFound(new Error('network'))).toBe(false);
+    expect(isNotFound(null)).toBe(false);
+  });
+});
 
 describe('shouldRetry', () => {
   it('로그인이 풀린 실패는 다시 하지 않는다', () => {

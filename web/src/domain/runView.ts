@@ -3,7 +3,7 @@ import {
   formatDateTimeRange,
   formatDistanceKm,
   formatDuration,
-  formatGapSeconds,
+  formatSecondsText,
   formatKm,
   formatListDateTime,
   formatMonthDay,
@@ -107,15 +107,6 @@ export type RunDetailView = {
   path: [number, number][];
 };
 
-/** 90 → "1분 30초", 60 → "1분", 45 → "45초" */
-function speakSeconds(seconds: number): string {
-  const total = Math.max(0, Math.round(seconds));
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  if (m === 0) return `${s}초`;
-  return s === 0 ? `${m}분` : `${m}분 ${s}초`;
-}
-
 /** 모드별 목표를 한 줄로: "1분 달리기 + 1분 30초 걷기 × 8". 모르는 모양이면 "–" */
 export function describeGoal(run: Pick<RunSummary, 'mode' | 'config'>): string {
   const num = (key: string): number | null => {
@@ -125,17 +116,17 @@ export function describeGoal(run: Pick<RunSummary, 'mode' | 'config'>): string {
   switch (run.mode) {
     case 'free': {
       const target = num('target_duration_sec');
-      return target == null ? '제한 없음' : speakSeconds(target);
+      return target == null ? '제한 없음' : formatSecondsText(target);
     }
     case 'interval': {
       const [runSec, walkSec, repeats] = [num('run_sec'), num('walk_sec'), num('repeats')];
       if (runSec == null || walkSec == null || repeats == null) return NO_VALUE;
-      return `${speakSeconds(runSec)} 달리기 + ${speakSeconds(walkSec)} 걷기 × ${repeats}`;
+      return `${formatSecondsText(runSec)} 달리기 + ${formatSecondsText(walkSec)} 걷기 × ${repeats}`;
     }
     case 'cadence': {
       const [spm, duration] = [num('spm'), num('duration_sec')];
       if (spm == null || duration == null) return NO_VALUE;
-      return `분당 ${spm}걸음 · ${speakSeconds(duration)}`;
+      return `분당 ${spm}걸음 · ${formatSecondsText(duration)}`;
     }
     case 'pacemaker': {
       const [pace, distance] = [num('target_pace_s_per_km'), num('distance_m')];
@@ -188,8 +179,8 @@ export function describeComparison(run: RunSummary, previous: RunSummary | null)
   // 페이스는 km당 초라서 값이 작을수록 빠르다
   const faster = Math.round(previous.avg_pace_s_per_km - run.avg_pace_s_per_km);
   let text = '지난번과 같은 페이스로 뛰었어요';
-  if (faster > 0) text = `지난번보다 페이스가 ${formatGapSeconds(faster)} 빨라졌어요`;
-  if (faster < 0) text = `지난번보다 ${formatGapSeconds(-faster)} 천천히 뛰었어요`;
+  if (faster > 0) text = `지난번보다 페이스가 ${formatSecondsText(faster)} 빨라졌어요`;
+  if (faster < 0) text = `지난번보다 ${formatSecondsText(-faster)} 천천히 뛰었어요`;
   return {
     text,
     detail: `같은 ${MODE_NOUNS[run.mode]} 기준 · ${formatPace(previous.avg_pace_s_per_km)} → ${formatPace(run.avg_pace_s_per_km)}`,

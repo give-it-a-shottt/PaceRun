@@ -6,10 +6,14 @@
 import type { User } from '../domain/types';
 import { ApiError, apiRequest } from './client';
 
-/** loading = 쿠키로 다시 로그인해 보는 중 / signedOut = 로그인 안 됨 / signedIn = 로그인됨 */
+/**
+ * loading = 쿠키로 다시 로그인해 보는 중 / signedOut = 로그인 안 됨 / signedIn = 로그인됨 /
+ * unreachable = 사이트를 열 때 서버에 닿지 못해 로그인 여부를 모름(로그인 화면으로 보내지 않고 다시 시도하게 한다)
+ */
 export type SessionState =
   | { status: 'loading'; user: null }
   | { status: 'signedOut'; user: null }
+  | { status: 'unreachable'; user: null }
   | { status: 'signedIn'; user: User };
 
 type TokenOut = { access_token: string; expires_in: number };
@@ -17,6 +21,13 @@ type AuthOut = TokenOut & { user: User };
 
 /** 액세스 토큰이 이만큼보다 적게 남았으면 미리 새로 받는다 */
 const ACCESS_TOKEN_MARGIN_MS = 30_000;
+/**
+ * 쿠키 갱신이 401이면 이만큼 기다렸다가 한 번 더 해 본다. 탭 두 개가 동시에 갱신하면 늦은 쪽은 "방금 쓴 쿠키"라
+ * 401을 받는데(서버는 이때 쿠키를 지우지 않는다), 잠깐 뒤에는 먼저 끝난 탭이 받은 새 쿠키가 실린다.
+ */
+const REFRESH_RETRY_DELAY_MS = 300;
+const HTTP_UNAUTHORIZED = 401;
+const HTTP_SERVER_ERROR_MIN = 500;
 
 let state: SessionState = { status: 'loading', user: null };
 const listeners = new Set<() => void>();
@@ -58,12 +69,29 @@ export class SessionExpiredError extends Error {
   }
 }
 
+function isUnauthorized(error: unknown): boolean {
+  return error instanceof ApiError && error.status === HTTP_UNAUTHORIZED;
+}
+
+function requestRefresh(): Promise<TokenOut> {
+  return apiRequest<TokenOut>('POST', '/auth/refresh', { cookieMode: true });
+}
+
 async function refreshAccessToken(): Promise<string> {
   try {
-    return keepAccessToken(await apiRequest<TokenOut>('POST', '/auth/refresh', { cookieMode: true }));
+    let tokens: TokenOut;
+    try {
+      tokens = await requestRefresh();
+    } catch (error) {
+      if (!isUnauthorized(error)) throw error;
+      // 다른 탭이 방금 같은 쿠키로 갱신했을 수 있다. 잠깐 뒤에 한 번만 더 해 본다.
+      await new Promise((resolve) => setTimeout(resolve, REFRESH_RETRY_DELAY_MS));
+      tokens = await requestRefresh();
+    }
+    return keepAccessToken(tokens);
   } catch (error) {
     // 서버가 쿠키를 받지 않았을 때만 로그인이 풀린 것이다. 서버에 닿지 못한 것은 그대로 올린다.
-    if (error instanceof ApiError && error.status === 401) {
+    if (isUnauthorized(error)) {
       signOutLocally();
       throw new SessionExpiredError();
     }
@@ -83,9 +111,16 @@ function freshAccessToken(force: boolean): Promise<string> {
   return refreshing;
 }
 
+/** 서버에 닿지 못했거나 서버 쪽 오류인가(쿠키가 살아 있을 수 있어 로그인이 풀렸다고 볼 수 없다) */
+function isServerTrouble(error: unknown): boolean {
+  if (error instanceof ApiError) return error.status >= HTTP_SERVER_ERROR_MIN;
+  return !(error instanceof SessionExpiredError);
+}
+
 /**
  * 사이트를 열 때 한 번: 쿠키로 액세스 토큰을 받아 보고, 되면 내 정보를 읽어 로그인된 상태로 만든다.
- * 안 되면(쿠키 없음 · 만료 · 서버에 닿지 못함) 로그인 안 된 상태로 연다. 던지지 않는다.
+ * 쿠키가 없거나 만료됐으면 로그인 안 된 상태로, 서버에 닿지 못했으면 unreachable로 연다(쿠키가 살아 있는 사람에게
+ * 비밀번호를 다시 치게 하지 않으려고 — 화면이 [다시 시도]를 보여 준다). 던지지 않는다.
  */
 export function restoreSession(): Promise<void> {
   if (!restoring) {
@@ -94,12 +129,20 @@ export function restoreSession(): Promise<void> {
         const token = await freshAccessToken(true);
         const user = await apiRequest<User>('GET', '/me', { accessToken: token });
         setState({ status: 'signedIn', user });
-      } catch {
-        signOutLocally();
+      } catch (error) {
+        accessToken = null;
+        setState(isServerTrouble(error) ? { status: 'unreachable', user: null } : { status: 'signedOut', user: null });
       }
     })();
   }
   return restoring;
+}
+
+/** unreachable에서 [다시 시도]: 읽는 중으로 되돌리고 한 번 더 해 본다. */
+export function retryRestoreSession(): Promise<void> {
+  restoring = null;
+  setState({ status: 'loading', user: null });
+  return restoreSession();
 }
 
 /** 실패하면 ApiError(401 INVALID_CREDENTIALS 등) · NetworkError를 던진다. */
@@ -109,10 +152,20 @@ export async function logIn(email: string, password: string): Promise<void> {
   setState({ status: 'signedIn', user: auth.user });
 }
 
-/** 서버에 닿지 못해도 이 브라우저에서는 로그아웃된다(쿠키는 남을 수 있다 — 다음에 열면 다시 로그인된다). */
-export async function logOut(): Promise<void> {
-  await apiRequest<void>('POST', '/auth/logout', { cookieMode: true }).catch(() => undefined);
+/**
+ * 로그아웃했으면 true. 서버에 닿지 못했으면 false이고 로그인된 채로 둔다 —
+ * 리프레시 쿠키(httpOnly)는 서버만 지울 수 있어서, 지우지 못한 채 "로그아웃됨"으로 보여 주면
+ * 다음에 사이트를 열 때 다시 로그인된다(함께 쓰는 PC에서 위험하다). 화면이 실패를 알린다.
+ */
+export async function logOut(): Promise<boolean> {
+  try {
+    await apiRequest<void>('POST', '/auth/logout', { cookieMode: true });
+  } catch (error) {
+    if (isServerTrouble(error)) return false;
+    // 서버가 요청을 거절한 것(4xx)은 쿠키가 이미 쓸모없다는 뜻이다. 이 브라우저에서는 로그아웃으로 본다.
+  }
   signOutLocally();
+  return true;
 }
 
 /**
