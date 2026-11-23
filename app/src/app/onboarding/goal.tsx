@@ -4,10 +4,10 @@ import { useRef, useState } from 'react';
 import { Button } from '@/components/Button';
 import { FlagCheckeredIcon } from '@/components/icons';
 import { OnboardingStep } from '@/components/onboarding/OnboardingStep';
-import { ReminderTimePicker, type ReminderChoice } from '@/components/onboarding/ReminderTimePicker';
+import { ReminderTimePicker } from '@/components/onboarding/ReminderTimePicker';
 import { TemplateCard } from '@/components/onboarding/TemplateCard';
-import { WeeklyGoalPicker } from '@/components/onboarding/WeeklyGoalPicker';
-import { DEFAULT_REMINDER_CLOCK, parseReminderTime, toReminderTime } from '@/domain/reminderTime';
+import { WeeklyGoalPicker } from '@/components/settings/WeeklyGoalPicker';
+import { reminderChoiceOf, reminderTimeOf, type ReminderChoice } from '@/domain/settingsView';
 import { completeOnboarding } from '@/services/onboarding';
 import { requestNotificationAccess } from '@/services/permissions';
 import { useSettingsStore } from '@/state/settingsStore';
@@ -22,10 +22,10 @@ export default function GoalStep() {
   const [goal, setGoal] = useState(savedGoal);
   // 피그마 기본 모양대로 알림은 켠 채(매일 오전 7:00), 템플릿은 고른 채로 연다.
   // 온보딩을 이미 마친 사람이 주소로 다시 들어온 경우에는 저장된 설정 그대로 연다(꺼 둔 알림을 다시 켜지 않게).
-  const [reminder, setReminder] = useState<ReminderChoice>(() => ({
-    enabled: alreadyDone ? savedReminderTime != null : true,
-    clock: parseReminderTime(savedReminderTime) ?? DEFAULT_REMINDER_CLOCK,
-  }));
+  const [reminder, setReminder] = useState<ReminderChoice>(() => {
+    const saved = reminderChoiceOf(savedReminderTime);
+    return alreadyDone ? saved : { ...saved, enabled: true };
+  });
   const [withTemplate, setWithTemplate] = useState(true);
 
   const [saving, setSaving] = useState(false);
@@ -37,7 +37,7 @@ export default function GoalStep() {
     savingRef.current = true;
     setSaving(true);
 
-    const reminderTime = reminder.enabled ? toReminderTime(reminder.clock) : null;
+    const reminderTime = reminderTimeOf(reminder);
     if (reminderTime) {
       // 저장하면 바로 알림이 예약되므로 그 전에 권한을 묻는다(이미 있으면 창이 뜨지 않는다). 거부해도 진행한다.
       try {

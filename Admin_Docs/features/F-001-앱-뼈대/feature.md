@@ -28,7 +28,7 @@
 - 바뀐 파일
   - 설정: `app/app.json`(이름 · 패키지 · 권한 · 플러그인), `app/package.json`, `app/tsconfig.json`, `app/vitest.config.mts`, `app/scripts/vitest.mjs`, `app/plugins/withCmakeVersion.js`
   - 테마: `app/src/theme/tokens.ts`, `ThemeContext.tsx`
-  - 공용 부품: `app/src/components/` AppText · Button · Card · TopBar · DockBar · BottomSheet · AlertDialog · Toast · Screen · ComingSoon · icons(아이콘을 하나씩 가져오는 곳)
+  - 공용 부품: `app/src/components/` AppText · Button · Card · TopBar · DockBar · BottomSheet · AlertDialog · Toast · Screen · ComingSoon · icons(아이콘을 하나씩 가져오는 곳) (ComingSoon — "준비 중" 화면 — 은 네 탭이 모두 채워진 F-007에서 지웠다)
   - DB: `app/src/db/schema.ts`(스키마 · 단계별 변경), `migrate.ts`(단계 적용), `database.ts`(연결), `settingsRepo.ts`
   - 로직 · 상태: `app/src/domain/types.ts`, `settings.ts`, `app/src/state/settingsStore.ts`, `toastStore.ts`
   - 라우트: `app/src/app/_layout.tsx`, `index.tsx`, `(tabs)/_layout.tsx`, `(tabs)/home · plan · records · my.tsx`

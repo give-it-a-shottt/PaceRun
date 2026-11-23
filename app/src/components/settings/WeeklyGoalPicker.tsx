@@ -16,7 +16,10 @@ type Props = {
   onChange: (goal: number) => void;
 };
 
-/** 주 목표 횟수 고르기(2~5회 가운데 하나). 선택은 색만이 아니라 체크와 굵은 글자로도 보여 준다. */
+/**
+ * 주 목표 횟수 고르기(2~5회 가운데 하나). 온보딩 3단계와 설정의 주 목표 시트가 함께 쓴다.
+ * 선택은 색만이 아니라 체크와 굵은 글자로도 보여 준다.
+ */
 export function WeeklyGoalPicker({ value, onChange }: Props) {
   const { colors } = useTheme();
 

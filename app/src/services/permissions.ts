@@ -5,6 +5,8 @@ import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import { Linking } from 'react-native';
 
+import type { NotificationAccess } from '@/domain/settingsView';
+
 export type LocationAccess = {
   /** 위치(앱 사용 중) 권한. 없으면 러닝을 기록할 수 없다. */
   foreground: boolean;
@@ -28,6 +30,15 @@ export async function getLocationAccess(): Promise<LocationAccess> {
 export async function requestLocationAccess(): Promise<LocationAccess> {
   await Location.requestForegroundPermissionsAsync();
   return getLocationAccess();
+}
+
+/** 알림 권한이 있는지만 본다(묻지 않는다). 확인하지 못하면 'unknown' */
+export async function getNotificationAccess(): Promise<NotificationAccess> {
+  try {
+    return (await Notifications.getPermissionsAsync()).granted ? 'granted' : 'denied';
+  } catch {
+    return 'unknown';
+  }
 }
 
 export async function requestNotificationAccess(): Promise<boolean> {
