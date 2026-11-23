@@ -12,11 +12,12 @@ import {
   listUnsyncedRunIds,
   markRunSynced,
 } from '@/db/runsRepo';
+import { isRecord } from '@/domain/guards';
 import { fromServerRun, toRunUpload } from '@/domain/syncMapping';
 import { useAuthStore, type SyncProblem } from '@/state/authStore';
 import { useSettingsStore } from '@/state/settingsStore';
 
-import { ApiError, NetworkError } from './apiClient';
+import { ApiError, badResponseError, NetworkError } from './apiClient';
 import { authorizedRequest, SessionExpiredError } from './session';
 
 /** 목록을 한 번에 이만큼씩 받는다(서버 상한) */
@@ -83,16 +84,22 @@ function problemOf(error: unknown): SyncProblem {
 async function runOnce(options: SyncOptions): Promise<void> {
   if (useAuthStore.getState().status !== 'signedIn') return;
   useAuthStore.setState({ syncing: true, syncProblem: null });
+  // 도는 사이에 로그아웃했으면 결과를 적지 않는다(로그아웃한 화면에 "올리지 못했어요"가 뜨지 않게)
+  const stillSignedIn = () => useAuthStore.getState().status === 'signedIn';
   try {
     await pushWeeklyGoal();
     const unsendable = await uploadPending();
     if (options.download) await downloadMissing();
-    useAuthStore.setState({ unsendableCount: unsendable });
-    await useSettingsStore.getState().update('lastSyncAt', Date.now());
+    if (stillSignedIn()) {
+      useAuthStore.setState({ unsendableCount: unsendable });
+      await useSettingsStore.getState().update('lastSyncAt', Date.now());
+    }
   } catch (error) {
     // 토큰 · 본문이 섞이지 않게 오류의 종류와 문구만 남긴다
     console.warn('[sync] 동기화를 끝내지 못했어요', error instanceof Error ? `${error.name}: ${error.message}` : 'unknown');
-    useAuthStore.setState({ syncProblem: problemOf(error) });
+    // 만료는 상태가 이미 expired로 바뀌어 있다. 그 밖의 문제는 아직 로그인돼 있을 때만 적는다.
+    const problem = problemOf(error);
+    if (problem === 'expired' || stillSignedIn()) useAuthStore.setState({ syncProblem: problem });
   } finally {
     useAuthStore.setState({ syncing: false });
     await refreshLocalOnlyCount();
@@ -121,13 +128,13 @@ async function uploadPending(): Promise<number> {
       unsendable += 1;
       continue;
     }
-    const run = await getRun(id).catch(() => null);
-    if (!run) {
-      // 읽을 수 없는 줄(목표값 칸이 깨짐)은 올릴 수 없다
+    // 폰에서 읽을 수 없는 러닝(목표값 칸이 깨짐 등)은 올릴 수 없다. 그 한 건 때문에 뒤의 러닝까지 못 올리지 않게 건너뛴다.
+    const stored = await Promise.all([getRun(id), getRunSegments(id), getRunPoints(id)]).catch(() => null);
+    if (!stored || !stored[0]) {
       unsendable += 1;
       continue;
     }
-    const [segments, points] = await Promise.all([getRunSegments(id), getRunPoints(id)]);
+    const [run, segments, points] = stored;
     const decision = toRunUpload(run, segments, points);
     if (decision.kind === 'skip') {
       unsendable += 1;
@@ -152,11 +159,10 @@ async function uploadPending(): Promise<number> {
 type RunListPage = { items: { id: string }[]; nextCursor: string | null };
 
 function readListPage(payload: unknown): RunListPage {
-  const page = payload as { items?: unknown; next_cursor?: unknown } | null;
-  if (!page || !Array.isArray(page.items)) throw new ApiError(200, 'BAD_RESPONSE', '서버의 응답을 읽지 못했어요');
+  if (!isRecord(payload) || !Array.isArray(payload.items)) throw badResponseError();
   return {
-    items: page.items.filter((item): item is { id: string } => typeof item?.id === 'string'),
-    nextCursor: typeof page.next_cursor === 'string' ? page.next_cursor : null,
+    items: payload.items.filter((item): item is { id: string } => isRecord(item) && typeof item.id === 'string'),
+    nextCursor: typeof payload.next_cursor === 'string' ? payload.next_cursor : null,
   };
 }
 

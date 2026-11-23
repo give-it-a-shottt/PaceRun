@@ -76,6 +76,13 @@ function lastSyncText(lastSyncAt: number | null, now: number): string {
   return isSameDay(lastSyncAt, now) ? `오늘 ${formatClock(lastSyncAt)}` : formatDateTime(lastSyncAt);
 }
 
+/** 로그인돼 있을 때 "지금 어디까지 올라갔나"를 계정 영역의 한 줄과 설정 줄의 값으로 */
+function signedInProgress(syncing: boolean, pending: number): { subtitle: string; rowText: string } {
+  if (syncing) return { subtitle: '동기화하는 중이에요', rowText: '동기화 중' };
+  if (pending > 0) return { subtitle: `올릴 기록 ${pending}개가 있어요`, rowText: `올릴 기록 ${pending}개` };
+  return { subtitle: '모든 기록이 서버에 올라가 있어요', rowText: '동기화됨' };
+}
+
 export function describeAccount(input: SyncInput): AccountView {
   const { status, email, syncing, localOnlyCount, unsendableCount } = input;
   const localOnly = localOnlyCount ?? 0;
@@ -89,17 +96,13 @@ export function describeAccount(input: SyncInput): AccountView {
   };
 
   if (status === 'signedIn') {
-    const subtitle = syncing
-      ? '동기화하는 중이에요'
-      : pending > 0
-        ? `올릴 기록 ${pending}개가 있어요`
-        : '모든 기록이 서버에 올라가 있어요';
+    const progress = signedInProgress(syncing, pending);
     return {
       ...shared,
       headerTitle: email ?? '로그인됨',
-      headerSubtitle: subtitle,
+      headerSubtitle: progress.subtitle,
       headerAction: null,
-      rowText: syncing ? '동기화 중' : pending > 0 ? `올릴 기록 ${pending}개` : '동기화됨',
+      rowText: progress.rowText,
       statusTitle: '계정이 연결돼 있어요',
       statusBody: `${email ?? '이'} 계정으로 기록을 올려요. 같은 계정으로 웹 대시보드에서도 볼 수 있어요.`,
       unsendableNote:

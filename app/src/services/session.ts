@@ -6,7 +6,7 @@ import * as SecureStore from 'expo-secure-store';
 
 import { useAuthStore } from '@/state/authStore';
 
-import { ApiError, apiRequest } from './apiClient';
+import { ApiError, apiRequest, badResponseError } from './apiClient';
 
 const REFRESH_TOKEN_KEY = 'pacerun.refreshToken';
 const EMAIL_KEY = 'pacerun.email';
@@ -56,7 +56,7 @@ export async function restoreSession(): Promise<void> {
 }
 
 async function startSession(auth: AuthOut): Promise<void> {
-  if (!auth.refresh_token) throw new ApiError(200, 'BAD_RESPONSE', '서버의 응답을 읽지 못했어요');
+  if (!auth.refresh_token) throw badResponseError();
   sessionEpoch += 1;
   // 리프레시 토큰을 먼저 저장한다. 저장에 실패하면 로그인된 것으로 치지 않는다.
   await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, auth.refresh_token);
@@ -111,7 +111,18 @@ async function expireSession(epoch: number): Promise<void> {
   if (epoch === sessionEpoch) useAuthStore.setState({ status: 'expired' });
 }
 
+/** 늦게 받은 토큰을 버린다: 보관함에 들어갔으면 지우고, 서버에도 폐기를 알린다(닿지 못하면 30일 뒤 스스로 만료된다). */
+async function discardLateToken(refreshToken: string, stored: boolean): Promise<void> {
+  if (stored && useAuthStore.getState().status !== 'signedIn') {
+    // 그 사이 다시 로그인했다면 보관함에는 새 로그인의 토큰이 있다. 로그인돼 있지 않을 때만 지운다.
+    await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY).catch(() => undefined);
+  }
+  await apiRequest<void>('POST', '/auth/logout', { body: { refresh_token: refreshToken } }).catch(() => undefined);
+}
+
 async function refreshAccessToken(): Promise<string> {
+  // 로그인돼 있지 않으면 갱신할 것이 없다. 상태는 건드리지 않는다(로그아웃한 것을 "만료"로 바꾸지 않게).
+  if (useAuthStore.getState().status !== 'signedIn') throw new SessionExpiredError();
   const epoch = sessionEpoch;
   const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
   if (!refreshToken) {
@@ -129,15 +140,19 @@ async function refreshAccessToken(): Promise<string> {
     }
     throw error;
   }
-  if (!tokens.refresh_token) throw new ApiError(200, 'BAD_RESPONSE', '서버의 응답을 읽지 못했어요');
+  if (!tokens.refresh_token) throw badResponseError();
   if (epoch !== sessionEpoch) {
     // 서버에 다녀오는 사이에 로그아웃했다. 새로 받은 토큰을 저장하면 로그아웃한 폰에 로그인이 되살아난다.
-    // 저장하지 않고, 서버에 남은 새 토큰도 폐기를 알린다(닿지 못하면 30일 뒤 스스로 만료된다).
-    await apiRequest<void>('POST', '/auth/logout', { body: { refresh_token: tokens.refresh_token } }).catch(() => undefined);
+    await discardLateToken(tokens.refresh_token, false);
     throw new SessionExpiredError();
   }
   // 쓴 토큰은 서버에서 이미 바뀌었다. 새 토큰을 저장하지 못하면 다음 갱신 때 만료로 드러난다.
   await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refresh_token);
+  if (epoch !== sessionEpoch) {
+    // 보관함에 넣는 사이에 로그아웃했다. 로그아웃의 지우기보다 이 쓰기가 늦게 닿았을 수 있으므로 다시 지운다.
+    await discardLateToken(tokens.refresh_token, true);
+    throw new SessionExpiredError();
+  }
   return keepAccessToken(tokens);
 }
 
@@ -159,14 +174,16 @@ function freshAccessToken(force: boolean): Promise<string> {
  */
 export async function authorizedRequest<T>(method: string, path: string, body?: unknown): Promise<T> {
   if (useAuthStore.getState().status !== 'signedIn') throw new SessionExpiredError();
+  // 이 요청이 시작된 로그인 판. 답을 기다리는 사이에 로그아웃했으면 뒤늦은 401로 상태를 바꾸지 않는다.
+  const epoch = sessionEpoch;
   const token = await freshAccessToken(false);
   try {
     return await apiRequest<T>(method, path, { body, accessToken: token });
   } catch (error) {
     if (!(error instanceof ApiError && error.status === 401)) throw error;
   }
+  if (epoch !== sessionEpoch) throw new SessionExpiredError();
   // 서버 시계와 어긋나 토큰이 먼저 만료된 경우. 새로 받아 한 번만 다시 보낸다.
-  const epoch = sessionEpoch;
   const retried = await freshAccessToken(true);
   try {
     return await apiRequest<T>(method, path, { body, accessToken: retried });

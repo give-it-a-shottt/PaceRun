@@ -167,6 +167,19 @@ describe('올리기', () => {
     expect(useAuthStore.getState().unsendableCount).toBe(1);
   });
 
+  it('경로 · 구간을 읽을 수 없는 러닝도 그 한 건만 건너뛴다', async () => {
+    vi.mocked(listUnsyncedRunIds).mockResolvedValue(['broken', 'ok']);
+    vi.mocked(getRunPoints).mockImplementation(async (id) => {
+      if (id === 'broken') throw new Error('disk');
+      return [];
+    });
+
+    await syncNow({ download: false });
+
+    expect(vi.mocked(markRunSynced).mock.calls).toEqual([['ok']]);
+    expect(useAuthStore.getState()).toMatchObject({ unsendableCount: 1, syncProblem: null });
+  });
+
   it('읽을 수 없는 러닝은 올릴 수 없는 기록으로 세고 넘어간다', async () => {
     vi.mocked(listUnsyncedRunIds).mockResolvedValue(['broken', 'ok']);
     vi.mocked(getRun).mockImplementation(async (id) => {
@@ -224,6 +237,22 @@ describe('도중에 실패했을 때', () => {
 
     expect(markRunSynced).not.toHaveBeenCalled();
     expect(useAuthStore.getState().syncProblem).toBe('server');
+  });
+
+  it('도는 사이에 로그아웃했으면 결과(실패 까닭 · 마지막 동기화 시각)를 적지 않는다', async () => {
+    vi.mocked(listUnsyncedRunIds).mockResolvedValue(['a']);
+    respondWith({
+      'PUT /runs/:id': () => {
+        // 올리는 요청이 가 있는 사이에 로그아웃했다
+        useAuthStore.setState({ status: 'signedOut', email: null, syncProblem: null, unsendableCount: 0 });
+        throw new NetworkError();
+      },
+    });
+
+    await syncNow({ download: false });
+
+    expect(useAuthStore.getState()).toMatchObject({ status: 'signedOut', syncing: false, syncProblem: null });
+    expect(saveSetting).not.toHaveBeenCalled();
   });
 
   it('오류를 던지지 않는다', async () => {

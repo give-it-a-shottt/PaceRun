@@ -2,6 +2,7 @@
 
 ## 내가 할 일
 - 서비스 소개 · AI가 대신 정한 결정(D-003~D-008) 확인 → START_HERE.md, decisions/
+- F-010 리뷰 판정 확인 · 3차 리뷰를 돌릴지 결정 · 면접 답 3개 · 실기기 확인 → features/F-010-앱-계정-연결/review/SUMMARY.md, feature.md
 - F-007 리뷰 판정 확인 · 면접 답 3개 · 실기기 확인 2가지(권한 창, 알림 도착) → features/F-007-설정/review/SUMMARY.md, feature.md
 - F-006 리뷰 판정 확인 · 면접 답 3개 · 화면 확인(다크, 형광펜, 실제 경로) → features/F-006-기록/review/SUMMARY.md, feature.md
 - F-005 리뷰 판정 확인 · 면접 답 3개 → features/F-005-주간-계획/review/SUMMARY.md, feature.md

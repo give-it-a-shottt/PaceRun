@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // 보관함(expo-secure-store)과 서버 요청을 가짜로 바꿔 "언제 로그인으로 치고, 언제 만료로 보는지"를 본다.
 const vault = new Map<string, string>();
 let failVaultWrite = false;
+/** 보관함에 넣기 직전에 기다리게 한다(넣는 사이에 다른 일이 끼어드는 경우를 만든다) */
+let beforeVaultWrite: (() => Promise<void>) | null = null;
 /** 이 키를 넣을 때만 실패하게 한다 */
 let failVaultWriteFor: string | null = null;
 
@@ -10,6 +12,7 @@ vi.mock('expo-secure-store', () => ({
   getItemAsync: vi.fn(async (key: string) => vault.get(key) ?? null),
   setItemAsync: vi.fn(async (key: string, value: string) => {
     if (failVaultWrite || failVaultWriteFor === key) throw new Error('keystore');
+    await beforeVaultWrite?.();
     vault.set(key, value);
   }),
   deleteItemAsync: vi.fn(async (key: string) => {
@@ -38,6 +41,7 @@ beforeEach(() => {
   vault.clear();
   failVaultWrite = false;
   failVaultWriteFor = null;
+  beforeVaultWrite = null;
   vi.restoreAllMocks();
 });
 
@@ -260,6 +264,55 @@ describe('로그인이 필요한 요청', () => {
     expect(useAuthStore.getState()).toMatchObject({ status: 'signedOut', email: null });
     // 서버에 남은 새 토큰도 폐기를 알렸다
     expect(apiRequest).toHaveBeenCalledWith('POST', '/auth/logout', { body: { refresh_token: 'refresh-2' } });
+  });
+
+  it('새 토큰을 보관함에 넣는 사이에 로그아웃해도, 늦게 들어간 토큰을 지우고 액세스 토큰을 되살리지 않는다', async () => {
+    vault.set(REFRESH_KEY, 'refresh-1');
+    vault.set(EMAIL_KEY, user.email);
+    const { session, apiRequest, useAuthStore } = await setup();
+    await session.restoreSession();
+    apiRequest.mockImplementation(async (_method, path) => (path === '/auth/refresh' ? tokenOut(2) : undefined) as never);
+    let finishWrite: () => void = () => {};
+    let writeStarted = false;
+    beforeVaultWrite = () => {
+      writeStarted = true;
+      return new Promise<void>((resolve) => (finishWrite = resolve));
+    };
+
+    const pending = session.authorizedRequest('GET', '/runs').catch((error: unknown) => error);
+    await vi.waitFor(() => expect(writeStarted).toBe(true));
+    beforeVaultWrite = null;
+    await session.logOut();
+    // 로그아웃의 지우기보다 늦게 닿는 쓰기
+    finishWrite();
+
+    expect(await pending).toBeInstanceOf(session.SessionExpiredError);
+    expect(vault.has(REFRESH_KEY)).toBe(false);
+    expect(useAuthStore.getState()).toMatchObject({ status: 'signedOut', email: null });
+    expect(apiRequest).toHaveBeenCalledWith('POST', '/auth/logout', { body: { refresh_token: 'refresh-2' } });
+    // 메모리에 액세스 토큰이 남아 있지 않다: 다음 요청은 서버에 가지 않는다
+    apiRequest.mockClear();
+    await expect(session.authorizedRequest('GET', '/runs')).rejects.toBeInstanceOf(session.SessionExpiredError);
+    expect(apiRequest).not.toHaveBeenCalled();
+  });
+
+  it('요청의 답을 기다리는 사이에 로그아웃했으면, 뒤늦게 온 401로 "만료"가 되지 않는다', async () => {
+    const { session, apiRequest, useAuthStore, ApiError } = await signedIn();
+    let failRequest: (error: unknown) => void = () => {};
+    apiRequest.mockImplementation((_method, path) => {
+      if (path === '/runs') return new Promise((_resolve, reject) => (failRequest = reject)) as never;
+      return Promise.resolve(undefined) as never;
+    });
+
+    const pending = session.authorizedRequest('GET', '/runs').catch((error: unknown) => error);
+    await vi.waitFor(() => expect(apiRequest).toHaveBeenCalledWith('GET', '/runs', expect.anything()));
+    await session.logOut();
+    failRequest(new ApiError(401, 'UNAUTHORIZED', '만료'));
+
+    expect(await pending).toBeInstanceOf(session.SessionExpiredError);
+    expect(useAuthStore.getState()).toMatchObject({ status: 'signedOut', email: null });
+    // 갱신을 시도하지 않는다
+    expect(apiRequest).not.toHaveBeenCalledWith('POST', '/auth/refresh', expect.anything());
   });
 
   it('토큰 갱신이 거절되는 사이에 로그아웃했으면 만료로 바꾸지 않는다', async () => {

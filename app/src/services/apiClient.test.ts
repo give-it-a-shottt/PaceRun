@@ -129,6 +129,23 @@ describe('서버에 닿지 못했을 때', () => {
     expect(error.message).not.toContain('10.0.2.2');
   });
 
+  it('머리글은 왔는데 본문이 멈춰도 시간 제한에 걸리면 NetworkError다(끝없이 기다리지 않는다)', async () => {
+    vi.useFakeTimers();
+    fetchMock.mockImplementation(async (_url: string, init: RequestInit) => ({
+      status: 200,
+      ok: true,
+      json: () =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+        }),
+    }));
+
+    const pending = apiRequest('GET', '/runs', { timeoutMs: 1000 }).catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(await pending).toBeInstanceOf(NetworkError);
+  });
+
   it('정해진 시간 안에 답이 없으면 요청을 끊고 NetworkError다', async () => {
     vi.useFakeTimers();
     fetchMock.mockImplementation(

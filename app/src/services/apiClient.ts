@@ -35,6 +35,11 @@ export class ApiError extends Error {
   }
 }
 
+/** 성공 응답인데 약속한 모양이 아닐 때(본문이 없음 · 꼭 있어야 할 칸이 없음). 서버 문제로 다룬다. */
+export function badResponseError(status = 200): ApiError {
+  return new ApiError(status, 'BAD_RESPONSE', '서버의 응답을 읽지 못했어요');
+}
+
 /** 서버에 닿지 못함(인터넷 없음 · 서버 꺼짐 · 시간 초과). 나중에 다시 시도하면 될 수 있다. */
 export class NetworkError extends Error {
   constructor(message = '서버에 연결하지 못했어요') {
@@ -74,34 +79,39 @@ export async function apiRequest<T>(method: string, path: string, options: Reque
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
 
-  let response: Response;
+  // 시간 제한은 본문을 다 읽을 때까지 건다(머리글만 오고 본문이 멈추는 경우에도 끝없이 기다리지 않게).
   try {
-    response = await fetch(baseUrl + path, {
-      method,
-      headers: {
-        Accept: 'application/json',
-        ...(options.body === undefined ? null : { 'Content-Type': 'application/json' }),
-        ...(options.accessToken ? { Authorization: `Bearer ${options.accessToken}` } : null),
-      },
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
-      signal: controller.signal,
-    });
-  } catch {
-    // fetch는 연결 실패 · 시간 초과(abort)를 모두 예외로 알린다. 원인 문구에는 주소가 들어 있어 그대로 올리지 않는다.
-    throw new NetworkError();
+    let response: Response;
+    try {
+      response = await fetch(baseUrl + path, {
+        method,
+        headers: {
+          Accept: 'application/json',
+          ...(options.body === undefined ? null : { 'Content-Type': 'application/json' }),
+          ...(options.accessToken ? { Authorization: `Bearer ${options.accessToken}` } : null),
+        },
+        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        signal: controller.signal,
+      });
+    } catch {
+      // fetch는 연결 실패 · 시간 초과(abort)를 모두 예외로 알린다. 원인 문구에는 주소가 들어 있어 그대로 올리지 않는다.
+      throw new NetworkError();
+    }
+
+    if (response.status === 204) return undefined as T;
+
+    let payload: unknown = null;
+    try {
+      payload = await response.json();
+    } catch {
+      // 본문을 읽다가 시간 제한에 걸렸으면 서버에 닿지 못한 것과 같다
+      if (controller.signal.aborted) throw new NetworkError();
+      // 그 밖에는 본문이 JSON이 아닌 것이다(프록시의 오류 페이지 등). 성공 응답이었다면 약속과 다른 것이므로 에러로 본다.
+    }
+    if (!response.ok) throw toApiError(response.status, payload);
+    if (payload === null) throw badResponseError(response.status);
+    return payload as T;
   } finally {
     clearTimeout(timer);
   }
-
-  if (response.status === 204) return undefined as T;
-
-  let payload: unknown = null;
-  try {
-    payload = await response.json();
-  } catch {
-    // 본문이 JSON이 아니다(프록시의 오류 페이지 등). 성공 응답이었다면 약속과 다른 것이므로 에러로 본다.
-  }
-  if (!response.ok) throw toApiError(response.status, payload);
-  if (payload === null) throw new ApiError(response.status, 'BAD_RESPONSE', '서버의 응답을 읽지 못했어요');
-  return payload as T;
 }
