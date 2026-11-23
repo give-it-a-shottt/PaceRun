@@ -67,3 +67,26 @@ export function stepMinute(clock: ReminderClock, direction: 1 | -1): ReminderClo
   const next = snapped + direction * REMINDER_MINUTE_STEP;
   return { ...clock, minute: (next + MINUTES_PER_HOUR) % MINUTES_PER_HOUR };
 }
+
+// ------------------------------------------------------------------ 알림 시간 고르기(온보딩 · 설정)
+
+/** 알림 시간 고르기: 켜기/끄기와 시각. 꺼도 고르던 시각은 화면이 들고 있다가 다시 켜면 보여 준다. */
+export type ReminderChoice = { enabled: boolean; clock: ReminderClock };
+
+/** 저장된 알림 시간("HH:mm" 또는 null) → 고르는 칸의 값. 꺼져 있으면 기본 시각(오전 7:00)을 채워 둔다. */
+export function reminderChoiceOf(time: string | null): ReminderChoice {
+  const clock = parseReminderTime(time);
+  return { enabled: clock != null, clock: clock ?? DEFAULT_REMINDER_CLOCK };
+}
+
+/** 고른 값 → 저장할 알림 시간. 껐으면 null */
+export function reminderTimeOf(choice: ReminderChoice): string | null {
+  return choice.enabled ? toReminderTime(choice.clock) : null;
+}
+
+export const REMINDER_OFF_TEXT = '끔';
+
+/** 알림 시간 줄에 보여 줄 글자: "매일 오전 7:00" / "끔"(설정 화면과 온보딩이 함께 쓴다) */
+export function reminderSummaryText(choice: ReminderChoice): string {
+  return choice.enabled ? `매일 ${formatReminderClock(choice.clock)}` : REMINDER_OFF_TEXT;
+}

@@ -41,11 +41,20 @@ export async function getNotificationAccess(): Promise<NotificationAccess> {
   }
 }
 
+/**
+ * 알림 권한을 요청한다(이미 있으면 창이 뜨지 않는다). 받았으면 true.
+ * 요청하다 오류가 나도 던지지 않고 false를 돌려준다 — 부르는 화면들은 권한이 없어도 하던 일을 이어 간다.
+ */
 export async function requestNotificationAccess(): Promise<boolean> {
-  const current = await Notifications.getPermissionsAsync();
-  if (current.granted) return true;
-  const requested = await Notifications.requestPermissionsAsync();
-  return requested.granted;
+  try {
+    const current = await Notifications.getPermissionsAsync();
+    if (current.granted) return true;
+    const requested = await Notifications.requestPermissionsAsync();
+    return requested.granted;
+  } catch (error) {
+    console.warn('[permissions] 알림 권한을 요청하지 못했어요', error);
+    return false;
+  }
 }
 
 /** optimized = 켜져 있음(화면이 꺼지면 기록이 끊길 수 있다) / unrestricted = 풀려 있음 / unknown = 확인하지 못함 */
@@ -84,6 +93,11 @@ export async function openLocationSettings(): Promise<void> {
 }
 
 /** 권한을 '다시 묻지 않음'으로 거절한 경우 앱 설정 화면에서 직접 켜야 한다. */
-export function openAppSettings(): Promise<void> {
-  return Linking.openSettings();
+export async function openAppSettings(): Promise<void> {
+  try {
+    await Linking.openSettings();
+  } catch (error) {
+    // 설정 화면을 열지 못해도 앱은 그대로 쓸 수 있어야 한다
+    console.warn('[permissions] 앱 설정 화면을 열지 못했어요', error);
+  }
 }

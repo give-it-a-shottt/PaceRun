@@ -1,11 +1,5 @@
 /** 설정 화면(MY_01_001)에 그릴 값과, 고를 수 있는 값의 목록. 화면은 이 결과를 그리기만 한다. */
-import {
-  DEFAULT_REMINDER_CLOCK,
-  formatReminderClock,
-  parseReminderTime,
-  toReminderTime,
-  type ReminderClock,
-} from './reminderTime';
+import { reminderChoiceOf, reminderSummaryText } from './reminderTime';
 import { CONFIG_LIMITS, nearestCadence } from './runConfig';
 import type { RunThemeSetting, Settings } from './types';
 
@@ -42,29 +36,10 @@ export const RUN_THEME_OPTIONS: readonly RunThemeOption[] = [
   { value: 'light', label: '항상 밝게', description: '폰이 다크 모드여도 러닝 화면은 밝게 보여요' },
 ];
 
-/** 알림 시간 고르기: 켜기/끄기와 시각. 꺼도 고르던 시각은 화면이 들고 있다가 다시 켜면 보여 준다. */
-export type ReminderChoice = { enabled: boolean; clock: ReminderClock };
-
-/** 저장된 알림 시간("HH:mm" 또는 null) → 고르는 칸의 값. 꺼져 있으면 기본 시각(오전 7:00)을 채워 둔다. */
-export function reminderChoiceOf(time: string | null): ReminderChoice {
-  const clock = parseReminderTime(time);
-  return { enabled: clock != null, clock: clock ?? DEFAULT_REMINDER_CLOCK };
-}
-
-/** 고른 값 → 저장할 알림 시간. 껐으면 null */
-export function reminderTimeOf(choice: ReminderChoice): string | null {
-  return choice.enabled ? toReminderTime(choice.clock) : null;
-}
-
 /** granted = 알림 권한 있음 / denied = 없음 / unknown = 아직 확인하지 못함 */
 export type NotificationAccess = 'granted' | 'denied' | 'unknown';
 
-export const REMINDER_OFF_TEXT = '끔';
-
-/** 알림 시간 줄에 보여 줄 글자: "매일 오전 7:00" / "끔"(설정 화면과 온보딩이 함께 쓴다) */
-export function reminderSummaryText(choice: ReminderChoice): string {
-  return choice.enabled ? `매일 ${formatReminderClock(choice.clock)}` : REMINDER_OFF_TEXT;
-}
+/** 알림을 켜 두었는데 폰의 알림 권한이 꺼져 있을 때 알림 시간 줄 아래에 보여 주는 안내 */
 export const REMINDER_BLOCKED_NOTICE = '알림 권한이 꺼져 있어 알림이 오지 않아요';
 
 export type SettingsView = {

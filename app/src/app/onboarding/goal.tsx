@@ -7,7 +7,7 @@ import { OnboardingStep } from '@/components/onboarding/OnboardingStep';
 import { ReminderTimePicker } from '@/components/onboarding/ReminderTimePicker';
 import { TemplateCard } from '@/components/onboarding/TemplateCard';
 import { WeeklyGoalPicker } from '@/components/WeeklyGoalPicker';
-import { reminderChoiceOf, reminderTimeOf, type ReminderChoice } from '@/domain/settingsView';
+import { reminderChoiceOf, reminderTimeOf, type ReminderChoice } from '@/domain/reminderTime';
 import { completeOnboarding } from '@/services/onboarding';
 import { requestNotificationAccess } from '@/services/permissions';
 import { useSettingsStore } from '@/state/settingsStore';
@@ -38,14 +38,8 @@ export default function GoalStep() {
     setSaving(true);
 
     const reminderTime = reminderTimeOf(reminder);
-    if (reminderTime) {
-      // 저장하면 바로 알림이 예약되므로 그 전에 권한을 묻는다(이미 있으면 창이 뜨지 않는다). 거부해도 진행한다.
-      try {
-        await requestNotificationAccess();
-      } catch (error) {
-        console.warn('[onboarding] 알림 권한을 요청하지 못했어요', error);
-      }
-    }
+    // 저장하면 바로 알림이 예약되므로 그 전에 권한을 묻는다(이미 있으면 창이 뜨지 않는다). 거부해도 진행한다.
+    if (reminderTime) await requestNotificationAccess();
 
     // 하나라도 저장되지 않았으면(토스트는 저장소가 띄운다) 이 화면에 남아 다시 누를 수 있게 한다
     if (!(await completeOnboarding({ weeklyGoal: goal, reminderTime }))) {

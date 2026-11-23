@@ -8,7 +8,7 @@
 - 실기기 확인 2가지(알림을 켤 때 권한 창, 고친 시각에 알림이 오는지) → 아래 "확인하지 못한 것"
 
 ## 한눈에 보기
-상태: [통과] (1차. 2차 진행 중)
+상태: [통과]
 무엇을: "내 정보" 탭의 설정 화면. 주 목표 횟수, 알림 시간, 음성 안내(켜기 · 간격), 기본 발걸음 박자, 러닝 화면 테마를 고친다. 저장 버튼 없이 바꾸는 순간 저장된다. 💡 비유: 벽의 전등 스위치 — 누르면 바로 바뀌고 "적용"을 따로 누르지 않는다.
 왜: 온보딩에서 한 번 정한 값(주 목표 · 알림 시간)을 나중에 고칠 곳이 필요하고, 뛰는 사람마다 다른 값(안내 간격 · 발걸음 박자 · 화면 밝기)을 맞출 수 있어야 한다.
 
@@ -34,13 +34,13 @@
 
 ## 결과 (AI 작성 — 구현 후)
 - 바뀐 파일 (모두 `app/src/` 아래)
-  - 계산(순수 함수): `domain/settingsView.ts`(줄마다 보여 줄 글자 `describeSettings`, 고를 수 있는 값의 목록, 발걸음 박자 한 칸 올리고 내리기, 알림 시간 값 바꾸기, 알림 권한 안내)
-  - 기기 기능: `services/permissions.ts`의 `getNotificationAccess`(묻지 않고 알림 권한만 확인)
+  - 계산(순수 함수): `domain/settingsView.ts`(줄마다 보여 줄 글자 `describeSettings`, 고를 수 있는 값의 목록, 발걸음 박자 한 칸 올리고 내리기, 알림 권한 안내), `domain/reminderTime.ts`(알림 시간 고르기: 저장 값 ↔ 고르는 칸의 값, 줄에 보여 줄 글자 — 온보딩과 함께 쓴다)
+  - 기기 기능: `services/permissions.ts`의 `getNotificationAccess`(묻지 않고 알림 권한만 확인). `requestNotificationAccess` · `openAppSettings`는 실패해도 오류를 던지지 않게 바꿨다(권한이 없어도 화면은 하던 일을 이어 간다)
   - 화면: `app/(tabs)/my.tsx`
   - 화면 부품: `components/settings/`(ListRow · SettingsSection · SettingsSheet · ChoiceList · ReminderNotice, 시트 5개 WeeklyGoalSheet · ReminderSheet · VoiceIntervalSheet · CadenceSheet · RunThemeSheet, 훅 useSettingsView)
   - 온보딩과 함께 쓰는 부품은 `components/` 바로 아래에 둔다: `Toggle` · `WeeklyGoalPicker` · `ReminderFields`(알림 토글과 시 · 분 칸) · `StepField`(− 값 +). 온보딩의 `ReminderTimePicker`는 줄과 펼침만 남기고 펼친 칸은 `ReminderFields`를 쓴다. `app/onboarding/goal.tsx`는 가져오는 경로와 알림 값 바꾸는 함수만 바뀌었다.
   - 지운 것: `components/ComingSoon.tsx`("준비 중" 화면 — 쓰는 탭이 없어졌다)
-  - 테스트: `domain/settingsView.test.ts`(15개 — 줄의 글자 · 알림 권한 안내 · 알림 시간 값 바꾸기 · 발걸음 박자 올리고 내리기 · 고를 수 있는 값의 목록), `services/permissions.test.ts`(3개 — 알림 권한 확인)
+  - 테스트: `domain/settingsView.test.ts`(16개 — 줄의 글자 · 알림 권한 안내 · 알림 시간 값 바꾸기 · 발걸음 박자 올리고 내리기 · 고를 수 있는 값의 목록 · 목록에 없는 값), `services/permissions.test.ts`(6개 — 알림 권한 확인 · 요청)
 - 실제 구조
   - 화면은 값을 계산하지 않는다. `useSettingsView`가 설정(store)과 폰의 알림 권한을 읽어 `describeSettings()`에 넘기고, 화면은 받은 글자를 그린다.
   - 저장은 F-001의 설정 store(`update(key, value)`)를 그대로 쓴다: 화면 값을 먼저 바꾸고 DB에 저장하고, 실패하면 그 값만 되돌리고 토스트로 알린다.
@@ -67,7 +67,7 @@
 - 확인하지 못한 것: 알림을 끈 상태에서 켤 때 권한 창이 뜨는 흐름(에뮬레이터에서는 권한을 명령으로 바꿨다), 고친 시각에 알림이 실제로 오는지, 저장 실패 안내, 음성 안내를 끄고 뛰었을 때 말하지 않는지(F-003의 테스트로만 확인)
 
 ## 리뷰
-- [review/SUMMARY.md](review/SUMMARY.md) — 1차(2026-11-23) [통과]: 위험 0 · 주의 0 · 제안 6 → 반영, 2차 진행 중
+- [review/SUMMARY.md](review/SUMMARY.md) — 2차(2026-11-23, R1 · R3) [통과]: 위험 0 · 주의 0 · 제안 5 → 4개 반영(1차 [통과]: 제안 6 → 반영). 3차는 돌리지 않았다
 
 ## 열린 질문
 - Q-004 (고를 수 있는 값의 범위 — 안내 간격 포함)

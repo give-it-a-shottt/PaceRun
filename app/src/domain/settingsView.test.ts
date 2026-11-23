@@ -1,14 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
+import { reminderChoiceOf, reminderSummaryText, reminderTimeOf } from './reminderTime';
 import { CONFIG_LIMITS } from './runConfig';
 import {
   canStepDefaultCadence,
   defaultCadenceText,
   describeSettings,
   REMINDER_BLOCKED_NOTICE,
-  reminderChoiceOf,
-  reminderSummaryText,
-  reminderTimeOf,
   RUN_THEME_OPTIONS,
   stepDefaultCadence,
   VOICE_INTERVAL_OPTIONS,
@@ -56,6 +54,13 @@ describe('설정 화면에 그릴 값', () => {
     expect(reminderSummaryText({ enabled: true, clock: { hour: 0, minute: 5 } })).toBe('매일 오전 12:05');
     expect(reminderSummaryText({ enabled: false, clock: { hour: 7, minute: 0 } })).toBe('끔');
     expect(defaultCadenceText(172)).toBe('분당 170걸음');
+  });
+
+  it('목록에 없는 값이 저장돼 있어도 글자를 만든다', () => {
+    // 안내 간격은 1~10km면 저장할 수 있다(고르는 목록은 1 · 2 · 3 · 5). 테마는 모르는 값이면 기본(자동)으로 보여 준다.
+    const view = describeSettings(settings({ voiceIntervalKm: 4, runTheme: 'dark' as never }), 'granted');
+    expect(view.voiceIntervalText).toBe('4km마다');
+    expect(view.runThemeText).toBe('자동 (OS 설정 따름)');
   });
 
   it('모양이 틀린 알림 시간은 끈 것으로 보여 준다', () => {

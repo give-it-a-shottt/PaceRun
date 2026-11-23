@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/AppText';
 import { CaretDownIcon, CaretRightIcon } from '@/components/icons';
 import { ReminderFields } from '@/components/ReminderFields';
-import { reminderSummaryText, type ReminderChoice } from '@/domain/settingsView';
+import { reminderSummaryText, type ReminderChoice } from '@/domain/reminderTime';
 import { useTheme } from '@/theme/ThemeContext';
 import { space } from '@/theme/tokens';
 

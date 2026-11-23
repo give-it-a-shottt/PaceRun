@@ -2,8 +2,14 @@ import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Toggle } from '@/components/Toggle';
-import { formatReminderHour, formatReminderMinute, stepHour, stepMinute, type ReminderClock } from '@/domain/reminderTime';
-import type { ReminderChoice } from '@/domain/settingsView';
+import {
+  formatReminderHour,
+  formatReminderMinute,
+  stepHour,
+  stepMinute,
+  type ReminderChoice,
+  type ReminderClock,
+} from '@/domain/reminderTime';
 import { space } from '@/theme/tokens';
 
 import { FieldPanel, StepField } from './StepField';

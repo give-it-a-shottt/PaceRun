@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 
-import { reminderChoiceOf, reminderTimeOf, type ReminderChoice } from '@/domain/settingsView';
+import { reminderChoiceOf, reminderTimeOf, type ReminderChoice } from '@/domain/reminderTime';
 import { requestNotificationAccess } from '@/services/permissions';
 import { useSettingsStore } from '@/state/settingsStore';
 
@@ -38,13 +38,8 @@ function OpenSheet({ onClose, onNotificationsAsked }: Omit<Props, 'visible'>) {
     if (next.enabled && !choice.enabled) {
       // 저장하면 바로 알림이 예약되므로 그 전에 권한을 묻는다(이미 있으면 창이 뜨지 않는다). 거부해도 켠 채로 저장한다.
       askingRef.current = true;
-      try {
-        await requestNotificationAccess();
-      } catch (error) {
-        console.warn('[settings] 알림 권한을 요청하지 못했어요', error);
-      } finally {
-        askingRef.current = false;
-      }
+      await requestNotificationAccess();
+      askingRef.current = false;
       onNotificationsAsked();
     }
 
