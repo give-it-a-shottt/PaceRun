@@ -86,15 +86,18 @@ export async function logIn(email: string, password: string): Promise<void> {
  * 서버에 닿지 못해도 폰에서는 로그아웃된다(토큰은 30일 뒤 스스로 만료된다).
  */
 export async function logOut(): Promise<void> {
-  // 지금 돌고 있는 토큰 갱신이 끝나도 그 결과를 쓰지 않게 판 번호부터 올린다
+  // 기다리는 일(보관함 · 서버)을 하기 전에, 한 번에: 판 번호를 올리고 · 액세스 토큰을 버리고 · 상태를 바꾼다.
+  // - 판 번호: 지금 돌고 있는 토큰 갱신 · 요청이 끝나도 그 결과를 쓰지 않게
+  // - 상태: 보관함을 지우는 사이에 새로 시작되는 요청 · 갱신이 "로그인돼 있지 않다"로 바로 막히게
   sessionEpoch += 1;
-  const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY).catch(() => null);
   accessToken = null;
+  useAuthStore.setState({ status: 'signedOut', email: null, syncProblem: null, unsendableCount: 0 });
+
+  const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY).catch(() => null);
   await Promise.all([
     SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY).catch(() => undefined),
     SecureStore.deleteItemAsync(EMAIL_KEY).catch(() => undefined),
   ]);
-  useAuthStore.setState({ status: 'signedOut', email: null, syncProblem: null, unsendableCount: 0 });
   if (refreshToken) {
     await apiRequest<void>('POST', '/auth/logout', { body: { refresh_token: refreshToken } }).catch(() => undefined);
   }

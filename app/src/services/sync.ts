@@ -97,9 +97,8 @@ async function runOnce(options: SyncOptions): Promise<void> {
   } catch (error) {
     // 토큰 · 본문이 섞이지 않게 오류의 종류와 문구만 남긴다
     console.warn('[sync] 동기화를 끝내지 못했어요', error instanceof Error ? `${error.name}: ${error.message}` : 'unknown');
-    // 만료는 상태가 이미 expired로 바뀌어 있다. 그 밖의 문제는 아직 로그인돼 있을 때만 적는다.
-    const problem = problemOf(error);
-    if (problem === 'expired' || stillSignedIn()) useAuthStore.setState({ syncProblem: problem });
+    // 로그아웃한 뒤라면 적지 않는다(만료로 끝났을 때는 상태가 expired라 적는다)
+    if (useAuthStore.getState().status !== 'signedOut') useAuthStore.setState({ syncProblem: problemOf(error) });
   } finally {
     useAuthStore.setState({ syncing: false });
     await refreshLocalOnlyCount();
@@ -182,8 +181,8 @@ async function downloadOne(id: string): Promise<void> {
     throw error;
   }
   const run = fromServerRun(payload);
-  if (!run) {
-    // 모양이 틀린 기록은 폰에 넣지 않는다
+  // 모양이 틀리거나, 달라고 한 번호와 다른 번호가 온 기록은 폰에 넣지 않는다
+  if (!run || run.id !== id) {
     console.warn('[sync] 내려받은 기록의 모양이 달라 건너뛰었어요');
     return;
   }

@@ -255,6 +255,21 @@ describe('도중에 실패했을 때', () => {
     expect(saveSetting).not.toHaveBeenCalled();
   });
 
+  it('로그아웃한 뒤 늦게 "만료"로 끝난 동기화도 로그아웃한 상태에 까닭을 적지 않는다', async () => {
+    vi.mocked(listUnsyncedRunIds).mockResolvedValue(['a']);
+    respondWith({
+      'PUT /runs/:id': () => {
+        useAuthStore.setState({ status: 'signedOut', email: null, syncProblem: null, unsendableCount: 0 });
+        // 로그아웃으로 토큰이 사라져 요청이 "로그인 필요"로 끝난다
+        throw new SessionExpiredError();
+      },
+    });
+
+    await syncNow({ download: false });
+
+    expect(useAuthStore.getState()).toMatchObject({ status: 'signedOut', syncProblem: null });
+  });
+
   it('오류를 던지지 않는다', async () => {
     vi.mocked(listUnsyncedRunIds).mockRejectedValue(new Error('disk'));
     await expect(syncNow({ download: false })).resolves.toBeUndefined();
@@ -328,6 +343,18 @@ describe('내려받기', () => {
     // 끝까지 간 것으로 본다
     expect(useAuthStore.getState().syncProblem).toBeNull();
     expect(saveSetting).toHaveBeenCalledWith('lastSyncAt', expect.any(Number));
+  });
+
+  it('달라고 한 번호와 다른 번호의 기록이 오면 넣지 않는다', async () => {
+    respondWith({
+      'GET /runs': () => ({ items: [{ id: 'asked' }], next_cursor: null }),
+      'GET /runs/:id': () => serverRun('another'),
+    });
+
+    await syncNow({ download: true });
+
+    expect(insertDownloadedRun).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().syncProblem).toBeNull();
   });
 
   it('한 건을 폰에 넣지 못해도 나머지를 받는다', async () => {
