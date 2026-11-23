@@ -2,6 +2,7 @@
 
 ## 내가 할 일
 - 서비스 소개 · AI가 대신 정한 결정(D-003~D-008) 확인 → START_HERE.md, decisions/
+- F-006 리뷰 판정 확인 · 면접 답 3개 · 화면 확인(다크, 형광펜, 실제 경로) → features/F-006-기록/review/SUMMARY.md, feature.md
 - F-005 리뷰 판정 확인 · 면접 답 3개 → features/F-005-주간-계획/review/SUMMARY.md, feature.md
 - F-004 실기기 확인 5가지 · 리뷰 판정 확인 · 면접 답 3개 → features/F-004-홈-꾸준함-장치/feature.md, review/SUMMARY.md
 - F-003 실기기 소리 확인 4가지 · 리뷰 판정 확인 · 면접 답 3개 → features/F-003-소리-안내-세-모드/feature.md, review/SUMMARY.md
@@ -12,7 +13,7 @@
 - 내가 정할 질문 12개 → OPEN_QUESTIONS.md
 
 ## 한눈에 보기
-됨 5 · 일부 3 · 다음 3 · 열린 질문 12개(내가 정할 것 12개)
+됨 6 · 일부 2 · 다음 3 · 열린 질문 12개(내가 정할 것 12개)
 최종 수정: 2026-11-23
 
 ## 기능별 상태

@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
@@ -6,16 +7,33 @@ import { ChartBarIcon, TimerIcon } from '@/components/icons';
 import { QuickRunGpsLinks, QuickRunGpsNotice, QuickRunLocationAlert } from '@/components/run/QuickRunFeedback';
 import { useQuickRun } from '@/components/run/useQuickRun';
 import { QUICK_RUN_LABEL } from '@/domain/runConfig';
+import { checkPendingRun } from '@/services/runController';
 import { useTheme } from '@/theme/ThemeContext';
 import { radius, space } from '@/theme/tokens';
 
 const ICON_CIRCLE_SIZE = 80;
 const ICON_SIZE = 40;
 
+/**
+ * 끝나지 않은 러닝이 남아 있으면 새로 시작하지 않고 홈으로 보낸다(홈이 "이어서 / 여기까지 저장"을 묻는다).
+ * 확인하지 못했으면 그대로 시작하게 둔다 — 시작하는 쪽이 한 번 더 막는다.
+ */
+async function sendHomeIfRunPending(): Promise<boolean> {
+  try {
+    if (await checkPendingRun()) {
+      router.navigate('/home');
+      return false;
+    }
+  } catch (error) {
+    console.warn('[records] 끝나지 않은 러닝을 확인하지 못했어요', error);
+  }
+  return true;
+}
+
 /** REC_01_003 기록 빈 상태: 안내와 [10분만 뛰기]. 홈의 [10분만 뛰기]와 같은 흐름으로 바로 시작한다. */
 export function RecordsEmpty() {
   const { colors } = useTheme();
-  const quickRun = useQuickRun();
+  const quickRun = useQuickRun({ canStart: sendHomeIfRunPending });
 
   return (
     <View style={styles.root}>
@@ -35,7 +53,7 @@ export function RecordsEmpty() {
           icon={TimerIcon}
           iconWeight="regular"
           loading={quickRun.busy}
-          onPress={quickRun.start}
+          onPress={() => void quickRun.start()}
         />
         <QuickRunGpsLinks quickRun={quickRun} />
       </View>

@@ -8,9 +8,9 @@ import { useStartRun } from './useStartRun';
 type Options = {
   /**
    * 시작해도 되는지 먼저 확인한다. false를 돌려주면 시작하지 않는다
-   * (홈: 끝나지 않은 러닝이 있으면 복구 창부터 띄운다).
+   * (홈: 끝나지 않은 러닝이 있으면 복구 창부터 띄운다 / 기록 탭 빈 상태: 홈으로 보내 복구 창을 띄운다).
    */
-  canStart?: () => boolean;
+  canStart?: () => boolean | Promise<boolean>;
 };
 
 /**
@@ -27,8 +27,8 @@ export function useQuickRun({ canStart }: Options = {}) {
     }, [cancel]),
   );
 
-  const start = () => {
-    if (canStart && !canStart()) return;
+  const start = async () => {
+    if (canStart && !(await canStart())) return;
     // 시트를 거치지 않으므로 '마지막 설정'은 바꾸지 않는다
     void startRun({ config: QUICK_RUN_CONFIG, planLabel: QUICK_RUN_LABEL, remember: false });
   };

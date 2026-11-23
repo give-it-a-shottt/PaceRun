@@ -103,6 +103,12 @@ describe('완료 요약 읽기', () => {
     expect(summary?.route).toHaveLength(2);
   });
 
+  it('읽다가 실패하면 오류를 그대로 올린다', async () => {
+    vi.mocked(getRun).mockResolvedValue(record());
+    vi.mocked(listRunDigests).mockRejectedValue(new Error('disk'));
+    await expect(loadSummaryView('run-1', STARTED_AT, 3)).rejects.toThrow('disk');
+  });
+
   it('없는 번호이거나 끝나지 않은 러닝이면 null이다', async () => {
     vi.mocked(getRun).mockResolvedValue(null);
     expect(await loadSummaryView('none', STARTED_AT, 3)).toBeNull();
@@ -118,6 +124,11 @@ describe('기록 탭 읽기', () => {
     expect(view.isEmpty).toBe(false);
     expect(view.totalText).toBe('3.1 km · 1회');
     expect(view.items.map((item) => item.id)).toEqual(['run-1']);
+  });
+
+  it('읽다가 실패하면 오류를 그대로 올린다', async () => {
+    vi.mocked(listPlanItems).mockRejectedValue(new Error('disk'));
+    await expect(loadRecords(STARTED_AT)).rejects.toThrow('disk');
   });
 
   it('러닝이 하나도 없으면 빈 상태다', async () => {

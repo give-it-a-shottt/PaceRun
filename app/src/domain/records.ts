@@ -184,7 +184,9 @@ function comparisonFor(run: FinishedRun, runs: readonly FinishedRun[]): Comparis
   return describeComparison(run, previousComparable(run, runs));
 }
 
-function statsFor(run: FinishedRun, paceSuffix: string): StatView[] {
+/** withPaceUnit: 평균 페이스 값 뒤에 "/km"를 붙일지(칸이 넓은 러닝 상세만 붙인다) */
+function statsFor(run: FinishedRun, { withPaceUnit }: { withPaceUnit: boolean }): StatView[] {
+  const paceSuffix = withPaceUnit ? '/km' : '';
   return [
     { label: '거리', value: `${formatDistanceKm(run.distanceM)} km` },
     { label: '시간', value: formatDuration(run.elapsedMs) },
@@ -204,24 +206,25 @@ export function describeRunDetail(input: {
     mode: run.mode,
     title: runTitle(run),
     timeText: run.endedAt == null ? formatDateTime(run.startedAt) : formatTimeRange(run.startedAt, run.endedAt),
-    stats: statsFor(run, '/km'),
+    stats: statsFor(run, { withPaceUnit: true }),
     note: run.counted ? null : NOT_COUNTED_NOTE,
     segments: segments.map(segmentRow),
   };
 }
 
+/** "달리기" / "걷기" / "1km" / "0.42km"(끝까지 못 채운 마지막 km 구간) */
+function segmentKindText(segment: RunSegment): string {
+  if (segment.kind !== 'km') return INTERVAL_KIND_LABEL[segment.kind];
+  if (segment.distanceM >= FULL_KM_MIN_M) return '1km';
+  return `${(segment.distanceM / KM).toFixed(2)}km`;
+}
+
 function segmentRow(segment: RunSegment, index: number): SegmentRowView {
-  const kindText =
-    segment.kind === 'km'
-      ? segment.distanceM >= FULL_KM_MIN_M
-        ? '1km'
-        : `${(segment.distanceM / KM).toFixed(2)}km`
-      : INTERVAL_KIND_LABEL[segment.kind];
   const pace =
     segment.distanceM >= SEGMENT_PACE_MIN_M ? segment.durationMs / 1000 / (segment.distanceM / KM) : null;
   return {
     no: index + 1,
-    kindText,
+    kindText: segmentKindText(segment),
     resting: segment.kind === 'walk',
     durationText: formatDuration(segment.durationMs),
     paceText: formatPace(pace),
@@ -263,7 +266,7 @@ export function describeSummary(input: {
     mode: run.mode,
     title: runTitle(run),
     dateText: formatDateTime(run.startedAt),
-    stats: statsFor(run, ''),
+    stats: statsFor(run, { withPaceUnit: false }),
     note: run.counted ? null : NOT_COUNTED_NOTE,
     week: {
       title: `이번 주 ${progress.count} / ${progress.goal}회`,
